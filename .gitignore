@@ -1,0 +1,31 @@
+# dependencies
+# Nếu có nhiều thư mục node_modules → dùng "node_modules/"
+# Nếu chỉ có 1 thư mục node_modules ở gốc → dùng "/node_modules"
+node_modules/
+
+# Yarn / PnP
+.pnp
+.pnp.js
+
+# testing coverage/ → do test frameworks như Jest tạo ra.
+coverage/
+
+# production build output
+# build/, dist/ → file build để deploy, không cần lưu vào Git.
+build/
+dist/
+
+# misc .env* → bỏ qua tất cả file môi trường, tránh lộ key/token.
+#.DS_Store → file của macOS, không cần thiết.
+.DS_Store 
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# log files giúp tránh commit file log lỗi.
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
