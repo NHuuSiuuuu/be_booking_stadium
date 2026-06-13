@@ -4,9 +4,9 @@ const controller = require(`../controllers/user.controller`);
 const { authMiddleWare } = require("../middleware/auth.middleware");
 
 router.get("/", authMiddleWare, controller.get);
-router.post("/create", authMiddleWare, controller.create);
+router.post("/create", controller.create);
 
-router.post("/create-admin", authMiddleWare, controller.createAdmin);
+router.post("/create-admin", controller.createAdmin);
 
 router.patch("/update/:id", authMiddleWare, controller.update);
 

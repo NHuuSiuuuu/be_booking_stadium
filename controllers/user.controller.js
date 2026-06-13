@@ -16,6 +16,7 @@ module.exports.get = async (req, res) => {
 
 module.exports.create = async (req, res) => {
   try {
+    console.log("req.body",req.body)
     const result = await UserService.create(req.body);
     return res.status(200).json(result);
   } catch (e) {

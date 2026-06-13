@@ -213,6 +213,10 @@ module.exports.create = async ({
 
     const utilityParse =
       typeof utility === "string" ? JSON.parse(utility) : utility;
+
+    const thumbnailParse =
+      typeof thumbnail === "string" ? JSON.parse(thumbnail) : thumbnail;
+
     const result = await pool.query(
       `
       INSERT INTO stadiums (
@@ -240,9 +244,9 @@ module.exports.create = async ({
         description,
         featured,
         status,
-        JSON.stringify(thumbnail), // QUAN TRỌNG,
+        thumbnailParse,
         type,
-        JSON.stringify(utilityParse),
+        utilityParse,
       ],
     );
 
@@ -287,6 +291,10 @@ module.exports.update = async (id, data) => {
     }
     const utilityParse =
       typeof utility === "string" ? JSON.parse(utility) : utility;
+
+    const thumbnailParse =
+      typeof thumbnail === "string" ? JSON.parse(thumbnail) : thumbnail;
+
     const result = await pool.query(
       `
       UPDATE stadiums
@@ -299,9 +307,9 @@ module.exports.update = async (id, data) => {
         description = $7,
         featured = $8,
         status = $9,
-        thumbnail = $10::jsonb,
+        thumbnail = $10,
         type = $11,
-        utility = $12::jsonb
+        utility = $12
       WHERE id = $13
       RETURNING *
       `,
@@ -309,15 +317,15 @@ module.exports.update = async (id, data) => {
         name,
         slug,
         address,
-        district_id,
+        district_id || null,
         lng || null,
         lat || null,
         description,
         featured,
         status,
-        JSON.stringify(thumbnail || []),
+        thumbnailParse,
         type,
-        JSON.stringify(utilityParse),
+        utilityParse,
         id,
       ],
     );
