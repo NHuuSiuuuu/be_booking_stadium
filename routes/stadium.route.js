@@ -48,10 +48,7 @@ router.get(
   StadiumController.detail,
 );
 
-router.get(
-  `/stadium/:slug`,authMiddleWare,
-  StadiumController.detailUser,
-);
+router.get(`/stadium/:slug`, StadiumController.detailUser);
 
 router.delete(
   `/stadium/delete/:id`,
