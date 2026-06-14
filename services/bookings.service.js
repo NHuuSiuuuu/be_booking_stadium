@@ -103,55 +103,55 @@ module.exports.create = async (req) => {
       booking.payment_method === "online"
         ? "Thanh toán online"
         : "Thanh toán tại sân";
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: email,
-        subject: "Đặt sân thành công",
-        html: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; background: #000;">
+    // try {
+    //   await transporter.sendMail({
+    //     from: process.env.EMAIL_USER,
+    //     to: email,
+    //     subject: "Đặt sân thành công",
+    //     html: `
+    //     <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; background: #000;">
           
-          <div style="padding: 24px; border-bottom: 1px solid #222;">
-            <span style="color: white; font-size: 18px; font-weight: bold;">
-              SÂNBÓNGHN
-            </span>
-          </div>
+    //       <div style="padding: 24px; border-bottom: 1px solid #222;">
+    //         <span style="color: white; font-size: 18px; font-weight: bold;">
+    //           SÂNBÓNGHN
+    //         </span>
+    //       </div>
 
-          <div style="padding: 40px 24px;">
-            <h2 style="color: white;">ĐẶT SÂN THÀNH CÔNG ⚽</h2>
+    //       <div style="padding: 40px 24px;">
+    //         <h2 style="color: white;">ĐẶT SÂN THÀNH CÔNG ⚽</h2>
 
-            <p style="color: #aaa;">
-              Cảm ơn bạn đã đặt sân. Thông tin chi tiết:
-            </p>
+    //         <p style="color: #aaa;">
+    //           Cảm ơn bạn đã đặt sân. Thông tin chi tiết:
+    //         </p>
 
-            <div style="background: #fff; padding: 20px; margin: 20px 0;">
-              <p><b>Mã đơn:</b> #${booking.id}</p>
-              <p><b>Sân:</b> ${info.stadium_name}</p>
-              <p><b>Ngày:</b> ${booking_date}</p>
-              <p><b>Giờ:</b> ${info.start_time} - ${info.end_time}</p>
-              <p><b>Tổng tiền:</b> ${totalPrice.toLocaleString("vi-VN")}đ</p>
-              <p><b>Thanh toán:</b> ${finalPaymentMethod}</p>
-            </div>
+    //         <div style="background: #fff; padding: 20px; margin: 20px 0;">
+    //           <p><b>Mã đơn:</b> #${booking.id}</p>
+    //           <p><b>Sân:</b> ${info.stadium_name}</p>
+    //           <p><b>Ngày:</b> ${booking_date}</p>
+    //           <p><b>Giờ:</b> ${info.start_time} - ${info.end_time}</p>
+    //           <p><b>Tổng tiền:</b> ${totalPrice.toLocaleString("vi-VN")}đ</p>
+    //           <p><b>Thanh toán:</b> ${finalPaymentMethod}</p>
+    //         </div>
 
-            <div style="text-align:center;">
-              <a href="${bookingLink}" 
-                style="background:white;color:black;padding:10px 20px;text-decoration:none;font-weight:bold;">
-                Xem đơn
-              </a>
-            </div>
-          </div>
+    //         <div style="text-align:center;">
+    //           <a href="${bookingLink}" 
+    //             style="background:white;color:black;padding:10px 20px;text-decoration:none;font-weight:bold;">
+    //             Xem đơn
+    //           </a>
+    //         </div>
+    //       </div>
 
-          <div style="padding: 16px; border-top: 1px solid #222;">
-            <span style="color: #444; font-size: 12px;">
-              © 2026 SÂNBÓNGHN
-            </span>
-          </div>
-        </div>
-        `,
-      });
-    } catch (err) {
-      console.log("Mail lỗi:", err.message);
-    }
+    //       <div style="padding: 16px; border-top: 1px solid #222;">
+    //         <span style="color: #444; font-size: 12px;">
+    //           © 2026 SÂNBÓNGHN
+    //         </span>
+    //       </div>
+    //     </div>
+    //     `,
+    //   });
+    // } catch (err) {
+    //   console.log("Mail lỗi:", err.message);
+    // }
 
     if (result.rows[0].payment_method === "online") {
       const booking = await pool.query(
