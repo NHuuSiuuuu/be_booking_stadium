@@ -2,7 +2,7 @@ const StadiumService = require("../services/stadiums.service");
 
 module.exports.index = async (req, res) => {
   try {
-    // console.log(req.query);
+    console.log(req.query);
     const stadiums = await StadiumService.index(req.query);
     // console.log(stadiums);
     return res.status(200).json(stadiums);

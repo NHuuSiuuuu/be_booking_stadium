@@ -165,7 +165,7 @@ module.exports.index = async ({
     );
 
 
-    const total = totalStadium.rows[0].total;
+    const total = totalStadium?.rows[0]?.total;
 
     return {
       message: "SUCCESS",
