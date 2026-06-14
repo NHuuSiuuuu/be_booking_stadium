@@ -98,7 +98,7 @@ module.exports.create = async (req) => {
       [booking.id],
     );
     const info = detail.rows[0];
-    const bookingLink = `http://localhost:5173/booking/success/${booking.id}`;
+    const bookingLink = `https://fe-booking-stadium.vercel.app/booking/success/${booking.id}`;
     const finalPaymentMethod =
       booking.payment_method === "online"
         ? "Thanh toán online"
@@ -189,7 +189,7 @@ module.exports.create = async (req) => {
         vnp_IpAddr: req.ip,
         vnp_TxnRef: booking.rows[0].id,
         vnp_OrderInfo: `Thanh toán đơn đặt # ${booking.rows[0].id}`,
-        vnp_ReturnUrl: "http://localhost:3636/api/check-payment-vnpay",
+        vnp_ReturnUrl: "https://fe-booking-stadium.vercel.app/api/check-payment-vnpay",
         vnp_Locale: VnpLocale.VN,
         vnp_CreateDate: dateFormat(new Date()),
         vnp_ExpireDate: dateFormat(tomorrow),
