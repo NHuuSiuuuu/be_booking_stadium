@@ -10,11 +10,12 @@ route.get(`/get`, authMiddleWare, BookingController.get);
 
 route.get(`/success/:id`, authMiddleWare, BookingController.success);
 
-route.get(`/booked-slots`, authMiddleWare, BookingController.bookedSlots);
+route.get(`/booked-slots`, BookingController.bookedSlots);
 
 route.post("/update-status", authMiddleWare, BookingController.updateStatus);
 
 route.post("/cancel/:id", authMiddleWare, BookingController.cancelBooking);
+
 route.get("/my", authMiddleWare, BookingController.getMyBookings);
 
 module.exports = route;

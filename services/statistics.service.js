@@ -20,7 +20,7 @@ module.exports.overview = async () => {
         FROM 
             bookings
         WHERE
-            payment_status = 'paid'
+            status = 'completed'
         AND booking_date >= DATE_TRUNC('month',CURRENT_DATE - INTERVAL '1 month')  
         GROUP BY month
         ORDER BY month
@@ -28,8 +28,12 @@ module.exports.overview = async () => {
         `,
     );
 
-    const preMonth = result.rows[0];
-    const currMonth = result.rows[1];
+    const preMonth = result.rows[0] || {
+      total_bookings: 0,
+      total_revenue: 0,
+      average_revenue: 0,
+    };
+    const currMonth = result.rows[1] || preMonth;
 
     // Hàm tính % tăng trưởng
     const calculateGrowth = (curr, prev) => {
@@ -69,7 +73,7 @@ module.exports.overview = async () => {
         booking_growth: bookingGrowth,
         revenue_growth: totalRevenueGrowth,
         average_revenue_growth: averageRevenueGrowth,
-        },
+      },
       message: "ok",
     };
   } catch (e) {
@@ -89,7 +93,7 @@ module.exports.bookingByMonth = async () => {
         FROM 
             bookings
         WHERE
-            payment_status = 'paid'
+            status = 'completed'
         GROUP BY DATE_TRUNC('month', booking_date)
         ORDER BY DATE_TRUNC('month', booking_date)
         `,
@@ -117,7 +121,7 @@ module.exports.topStadiums = async () => {
         FROM bookings b
         JOIN stadiums s
             ON s.id = b.stadium_id
-            AND payment_status = 'paid'
+            AND b.status = 'completed'
         GROUP BY s.id, s.name
         ORDER BY total_bookings DESC
         LIMIT 10;

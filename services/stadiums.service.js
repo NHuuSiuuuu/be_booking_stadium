@@ -136,14 +136,21 @@ module.exports.index = async ({
     // console.log(values);
 
     const result = await pool.query(
-      `SELECT stadiums.*
-      ${selectDistance ? `, ${selectDistance}` : ""},
-      ST_Y(stadiums.geom) AS lat,
-      ST_X(stadiums.geom) AS lng,
-      price_configs.start_time,
-      price_configs.end_time,
-      price_configs.price
-       ${baseWhere} ${orderSql} ${limitSql} ${offsetSql}
+      `
+      SELECT stadiums.*,
+        ST_Y(stadiums.geom) AS lat,
+        ST_X(stadiums.geom) AS lng,
+        ${selectDistance ? `${selectDistance},` : ""}
+      JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'start_time', price_configs.start_time,
+          'end_time', price_configs.end_time,
+          'price', price_configs.price
+        ) ORDER BY price_configs.start_time
+      ) FILTER (WHERE price_configs.id IS NOT NULL) AS price_configs
+      ${baseWhere}
+      GROUP BY stadiums.id
+      ${orderSql} ${limitSql} ${offsetSql}
       `,
       values,
     );
@@ -151,26 +158,15 @@ module.exports.index = async ({
     // OVER tính toán ko làm mất dữ liệu từng dòng
     const totalStadium = await pool.query(
       `SELECT COUNT(*) AS total
-     ${baseWhere}
+       ${baseWhere}
+       GROUP BY stadiums.id
     `,
       values.slice(0, values.length - 2), // bỏ limit + offset (bỏ 2 thằng ở cuối cùng)
     );
 
+
     const total = totalStadium.rows[0].total;
-    // console.log(
-    //   "QUERY:",
-    //   `SELECT stadiums.*
-    //   ${selectDistance ? `, ${selectDistance}` : ""},
-    //   ST_Y(stadiums.geom) AS lat,
-    //   ST_X(stadiums.geom) AS lng,
-    //   price_configs.start_time,
-    //   price_configs.end_time,
-    //   price_configs.price
-    //    ${baseWhere} ${orderSql} ${limitSql} ${offsetSql}
-    //   `,
-    // );
-    // console.log("VALUES:", values.slice(0, values.length - 2));
-    // console.log("VALUES:", values);
+
     return {
       message: "SUCCESS",
       stadiums: result.rows,

@@ -4,7 +4,7 @@ const StatisticsController = require("../controllers/statistics.controller");
 
 const { authMiddleWare } = require("../middleware/auth.middleware");
 
-route.get(`/overview`, authMiddleWare, StatisticsController.overview);
+route.get(`/overview`, StatisticsController.overview);
 
 route.get(
   `/revenue-by-month`,
