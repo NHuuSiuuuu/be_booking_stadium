@@ -12,7 +12,7 @@ router.patch("/update/:id", authMiddleWare, controller.update);
 
 router.delete("/delete/:id", authMiddleWare, controller.delete);
 
-router.post("/password/forgot", authMiddleWare, controller.forgotPassword);
+router.post("/password/forgot", controller.forgotPassword);
 
 router.post(
   "/password/resetPassword",
