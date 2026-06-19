@@ -48,6 +48,24 @@ module.exports.bookedSlots = async (req, res) => {
   }
 };
 
+module.exports.holdSlots = async (req, res) => {
+  try {
+    const { stadium_id, date, price_config_id, socket_id } = req.query;
+    // console.log("Chayyj vqua controller",socket_id);
+    const result = await BookingService.holdSlots(
+      stadium_id,
+      date,
+      price_config_id,
+      socket_id
+    );
+    return res.status(200).json(result);
+  } catch (e) {
+    return res.status(e.status || 500).json({
+      message: e.message,
+    });
+  }
+};
+
 module.exports.updateStatus = async (req, res) => {
   try {
     const order = await BookingService.updateStatus(req.body);

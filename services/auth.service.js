@@ -63,7 +63,7 @@ module.exports.getMe = async (id) => {
       `,
       [id],
     );
-    console.log("id là", result.rows[0]);
+    // console.log("id là", result.rows[0]);
     return {
       user: {
         id: result.rows[0].id,

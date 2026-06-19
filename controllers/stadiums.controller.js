@@ -2,9 +2,8 @@ const StadiumService = require("../services/stadiums.service");
 
 module.exports.index = async (req, res) => {
   try {
-    console.log(req.query);
     const stadiums = await StadiumService.index(req.query);
-    // console.log(stadiums);
+    console.log("QUERY DATABASE");
     return res.status(200).json(stadiums);
   } catch (e) {
     return res.status(500).json({
@@ -12,8 +11,6 @@ module.exports.index = async (req, res) => {
     });
   }
 };
-
-
 
 module.exports.create = async (req, res) => {
   try {

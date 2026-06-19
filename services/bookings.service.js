@@ -378,28 +378,183 @@ module.exports.success = async (id) => {
 };
 
 // Kiểm tra sân bóng đã được đặt
+// API trả về: mảng slot đã được đặt + slot đang được giữ
 module.exports.bookedSlots = async (stadium_id, date) => {
   try {
     // Kiểm tra trùng lịch - cùng sân, cùng ngày
-    // Lấy ra mảng price_config_id đã được đặt
-    console.log(stadium_id, date);
+    // Lấy ra mảng slot (price_config_id) đã được đặt
 
-    const conflict = await pool.query(
+    const booked = await pool.query(
       `
-        SELECT price_config_id FROM bookings
+        SELECT price_config_id 
+        FROM bookings
         WHERE stadium_id = $1
         AND booking_date = $2
         AND status != 'cancelled'
         `,
       [stadium_id, date],
     );
+    const holding = await pool.query(
+      `
+        SELECT price_config_id
+        FROM booking_holds
+        WHERE stadium_id = $1
+        AND booking_date = $2
+        AND expires_at > NOW()
+      `,
+      [stadium_id, date],
+    );
 
     console.log(
       "Slot đã đặt",
-      conflict.rows.map((r) => r.price_config_id),
+      booked.rows.map((r) => r.price_config_id),
+    );
+
+    console.log(
+      "Slot đang được giữ",
+      holding.rows.map((r) => r.price_config_id),
     );
     return {
-      result: conflict.rows.map((r) => r.price_config_id),
+      // API trả về: mảng slot đã được đặt + slot đang được giữ
+      booked: booked.rows.map((r) => r.price_config_id),
+      holding: holding.rows.map((r) => r.price_config_id),
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
+// Kiểm tra slot có đang được giữ
+module.exports.holdSlots = async (
+  stadium_id,
+  date,
+  price_config_id,
+  socket_id,
+) => {
+  try {
+    // Xóa những hold có expires_at < NOW()
+    await pool.query(
+      `
+      DELETE
+      FROM booking_holds
+      WHERE expires_at < NOW()
+      `,
+    );
+
+    // Tìm xem chính thiết bị/tài khoản này trc đấy đã giữ slot chưa để xóa
+    // // Xóa đang giữ của thiết bị đấy khi chọn sang khung giờ khác chứ không để 10s mới bấm đc
+
+    let oldHold;
+    if (socket_id) {
+      oldHold = await pool.query(
+        `SELECT price_config_id FROM booking_holds 
+       WHERE stadium_id = $1 AND booking_date = $2 AND socket_id = $3`,
+        [stadium_id, date, socket_id],
+      );
+    }
+    if (oldHold.rows.length > 0) {
+      const oldSlotId = oldHold.rows[0].price_config_id;
+      if (socket_id) {
+        await pool.query(
+          `DELETE FROM booking_holds
+         WHERE price_config_id = $1 AND socket_id = $2`,
+          [oldSlotId, socket_id],
+        );
+        // Báo cho frontend mở khóa slot nào
+        io.to(`stadium-${stadium_id}`).emit("sold-released", {
+          price_config_id: oldSlotId,
+        });
+        console.log(`Chạy đến đây: stadium-${stadium_id} `);
+      }
+    }
+
+ 
+
+    // Kiểm tra slot đấy đã được booking chưa <ktra sân này, ngày này, giờ này>
+    // Slot đã đặt rồi thì không cho giữ nữa
+    const booked = await pool.query(
+      `
+        SELECT price_config_id 
+        FROM bookings
+        WHERE stadium_id = $1
+        AND booking_date = $2
+        AND price_config_id = $3
+        AND status != 'cancelled'
+        `,
+      [stadium_id, date, price_config_id],
+    );
+
+    // Slot đã được đặt rồi thì không cho giữ nữa
+    if (booked.rows.length) {
+      throw new Error("Slot đã được đặt");
+    }
+
+    // TH slot chưa được đặt thì kiểm tra xem có ai đang giữ tạm thời không
+    const holding = await pool.query(
+      `
+        SELECT id
+        FROM booking_holds
+        WHERE stadium_id = $1
+        AND booking_date = $2
+        AND price_config_id = $3
+        AND expires_at > NOW()
+    `,
+      [stadium_id, date, price_config_id],
+    );
+
+    // Slot đang được giữ rồi thì dừng ở đây
+    if (holding.rows.length) {
+      throw new Error("Slot đang được giữ");
+    }
+
+    // Nếu slot đấy không được giữ
+    await pool.query(
+      `
+    INSERT INTO booking_holds(
+      stadium_id,
+      booking_date,
+      price_config_id,
+      expires_at,
+      socket_id
+    )
+    VALUES(
+      $1,
+      $2,
+      $3,
+      NOW() + INTERVAL '10 seconds',
+      $4
+    )
+    `,
+      [stadium_id, date, price_config_id, socket_id],
+    );
+
+    // Gửi event sold-held cho tất cả socket trong roomstadium-${stadium_id}
+    io.to(`stadium-${stadium_id}`).emit("sold-held", {
+      price_config_id,
+    });
+
+    setTimeout(async () => {
+      // Xóa những hold có expires_at < NOW()
+      await pool.query(
+        `
+      DELETE
+      FROM booking_holds
+      WHERE stadium_id = $1
+      AND booking_date = $2
+      AND price_config_id = $3
+      `,
+        [stadium_id, date, price_config_id],
+      );
+
+      // Sau phát ra sự kiện bỏ giữ
+      io.to(`stadium-${stadium_id}`).emit("sold-released", {
+        price_config_id,
+      });
+    }, 10000);
+
+    // console.log("io mo", io.id);
+    return {
+      message: "success",
     };
   } catch (e) {
     throw e;

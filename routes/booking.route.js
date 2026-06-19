@@ -12,6 +12,8 @@ route.get(`/success/:id`, authMiddleWare, BookingController.success);
 
 route.get(`/booked-slots`, BookingController.bookedSlots);
 
+route.get(`/hold-slot`, BookingController.holdSlots);
+
 route.post("/update-status", authMiddleWare, BookingController.updateStatus);
 
 route.post("/cancel/:id", authMiddleWare, BookingController.cancelBooking);

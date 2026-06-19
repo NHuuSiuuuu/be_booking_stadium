@@ -12,9 +12,6 @@ module.exports.index = async ({
   radius,
 }) => {
   try {
-    // { status: 'true', featured: 'true' }
-    // FROM stadiums WHERE 1=1 AND status = $1 AND featured = $2
-    // values [ true, true ]
     let baseWhere = `
     FROM stadiums 
     LEFT JOIN price_configs ON price_configs.stadium_id  = stadiums.id
@@ -34,7 +31,6 @@ module.exports.index = async ({
         filters[key] = value; // {status:true}
       });
     }
-    // console.log(filters);
     // Filter status
     if (filters.status !== undefined) {
       baseWhere += ` AND status = $${index}`;
@@ -141,13 +137,15 @@ module.exports.index = async ({
         ST_Y(stadiums.geom) AS lat,
         ST_X(stadiums.geom) AS lng,
         ${selectDistance ? `${selectDistance},` : ""}
-      JSON_AGG(
-        JSON_BUILD_OBJECT(
-          'start_time', price_configs.start_time,
-          'end_time', price_configs.end_time,
-          'price', price_configs.price
-        ) ORDER BY price_configs.start_time
-      ) FILTER (WHERE price_configs.id IS NOT NULL) AS price_configs
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'start_time', price_configs.start_time,
+            'end_time', price_configs.end_time,
+            'price', price_configs.price
+          ) ORDER BY price_configs.start_time
+        ) FILTER (WHERE price_configs.id IS NOT NULL) AS price_configs,
+        MIN(price_configs.price) as min_price,
+        MAX(price_configs.price) as max_price
       ${baseWhere}
       GROUP BY stadiums.id
       ${orderSql} ${limitSql} ${offsetSql}
@@ -157,16 +155,15 @@ module.exports.index = async ({
 
     // OVER tính toán ko làm mất dữ liệu từng dòng
     const totalStadium = await pool.query(
-      `SELECT COUNT(*) AS total
+      `SELECT COUNT(DISTINCT stadiums.id) AS total
        ${baseWhere}
-       GROUP BY stadiums.id
+   
     `,
       values.slice(0, values.length - 2), // bỏ limit + offset (bỏ 2 thằng ở cuối cùng)
     );
 
-
-    const total = totalStadium?.rows[0]?.total;
-
+    const total = totalStadium?.rows[0].total;
+    console.log("total",total)
     return {
       message: "SUCCESS",
       stadiums: result.rows,
@@ -336,7 +333,7 @@ module.exports.update = async (id, data) => {
 
 module.exports.delete = async (id) => {
   try {
-    console.log(id);
+    // console.log(id);
     await pool.query(
       ` DELETE 
         FROM stadiums
@@ -365,7 +362,7 @@ module.exports.detail = async (id) => {
 
 module.exports.detailUser = async (slug) => {
   try {
-    console.log(slug);
+    // console.log(slug);
     const result = await pool.query(
       ` SELECT* 
         FROM stadiums

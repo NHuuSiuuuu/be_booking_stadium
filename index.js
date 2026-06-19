@@ -6,7 +6,18 @@ const cors = require("cors");
 const app = express();
 const { Pool } = require("pg");
 const cookieParser = require("cookie-parser");
-const routes = require("./routes/index.route"); //
+const routes = require("./routes/index.route");
+
+const http = require("http");
+const server = http.createServer(app);
+const { Server } = require("socket.io");
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
+});
+
+global.io = io;
 
 // Ban đầu cors * : cho phép tất cả trình duyệt đc vào - khi gửi cookiue vào trình duyệt - trình d nghĩ nguy hiểm -> chặn
 app.use(
@@ -51,6 +62,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(port, () => {
+io.on("connection", (socket) => {
+  console.log("Một user đã nết nối", socket.id);
+
+  socket.on("join-stadium", (stadiumId) => {
+    socket.join(`stadium-${stadiumId}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User đã bị ngắt kết nối");
+  });
+});
+
+server.listen(port, () => {
   console.log("Server running in port:", port);
 });
