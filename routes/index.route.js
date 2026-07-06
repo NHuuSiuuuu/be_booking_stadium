@@ -5,6 +5,8 @@ const userRoute = require("./user.route");
 const authRoute = require("./auth.route");
 const bookingRoute = require("./booking.route");
 const statisticsRoute = require("./statistics.route");
+
+const reviewsRoute = require("./reviews.route");
 const { adminMiddleWare } = require("../middleware/admin.middleware");
 
 module.exports = (app) => {
@@ -21,6 +23,8 @@ module.exports = (app) => {
   app.use("/api/booking", bookingRoute);
 
   app.use("/api/statistics", statisticsRoute);
+
+  app.use("/api/reviews", reviewsRoute);
 
   
 };
