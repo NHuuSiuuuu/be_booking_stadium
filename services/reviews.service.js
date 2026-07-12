@@ -33,12 +33,12 @@ module.exports.create = async (bookingId, rating, comment, userId) => {
         message: "Không có quyền đánh giá",
       };
     }
-    if (booking.status !== "completed") {
-      throw {
-        status: 400,
-        message: "Chi được đánh giá sau khi hoàn thành",
-      };
-    }
+    // if (booking.status !== "completed") {
+    //   throw {
+    //     status: 400,
+    //     message: "Chi được đánh giá sau khi hoàn thành",
+    //   };
+    // }
 
     // Kiểm tra xem đã đánh giá sân đấy chưa - nếu đánh giá rồi không cho đánh giá nữa
     const reviewResult = await pool.query(

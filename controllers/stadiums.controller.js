@@ -14,7 +14,6 @@ module.exports.index = async (req, res) => {
 
 module.exports.create = async (req, res) => {
   try {
-    console.log(req.body);
     const stadiums = await StadiumService.create(req.body);
     return res.status(200).json(stadiums);
   } catch (e) {

@@ -1,5 +1,6 @@
 const { pool } = require("../pool");
 const slugify = require("slugify");
+const chatController = require("../controllers/chat.controller");
 
 module.exports.index = async ({
   filter,
@@ -163,7 +164,7 @@ module.exports.index = async ({
     );
 
     const total = totalStadium?.rows[0].total;
-    console.log("total",total)
+    console.log("total", total);
     return {
       message: "SUCCESS",
       stadiums: result.rows,
@@ -243,6 +244,7 @@ module.exports.create = async ({
       ],
     );
 
+    chatController.updateDocument(result.rows[0].id);
     return {
       message: "SUCCESS",
       stadium: result.rows,
@@ -322,6 +324,8 @@ module.exports.update = async (id, data) => {
         id,
       ],
     );
+    chatController.updateDocument(id);
+
     return {
       message: "SUCCESS",
       stadium: result.rows,
@@ -332,17 +336,37 @@ module.exports.update = async (id, data) => {
 };
 
 module.exports.delete = async (id) => {
+  const client = await pool.connect();
+
   try {
-    // console.log(id);
-    await pool.query(
-      ` DELETE 
-        FROM stadiums
-        WHERE id=${id}
+    await client.query("BEGIN");
+
+    await client.query(
+      `
+      DELETE FROM stadiums
+      WHERE id = $1
       `,
+      [id],
     );
-    return { message: "Xóa thành công!" };
+
+    await client.query(
+      `
+      DELETE FROM documents
+      WHERE source_type = 'stadiums'
+      AND source_id = $1
+      `,
+      [id],
+    );
+    await client.query("COMMIT");
+
+    return {
+      message: "Xóa thành công!",
+    };
   } catch (e) {
+    await client.query("ROLLBACK"); // Lỗi thì hủy tất cả vừa làm
     throw e;
+  } finally {
+    client.release(); // trả lại kết nối sau khi dùng xong ( vì trên này await pool.connect(); mình mượn connect của pool)
   }
 };
 

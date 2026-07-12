@@ -7,6 +7,7 @@ const bookingRoute = require("./booking.route");
 const statisticsRoute = require("./statistics.route");
 
 const reviewsRoute = require("./reviews.route");
+const chatRoute = require("./chat.route");
 const { adminMiddleWare } = require("../middleware/admin.middleware");
 
 module.exports = (app) => {
@@ -25,6 +26,8 @@ module.exports = (app) => {
   app.use("/api/statistics", statisticsRoute);
 
   app.use("/api/reviews", reviewsRoute);
+
+  app.use("/api/chat", chatRoute);
 
   
 };
