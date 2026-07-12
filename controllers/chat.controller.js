@@ -124,8 +124,9 @@ module.exports.index = async (req, res) => {
     );
   }
   console.log("vectors.length", vectors);
-
-  // const vector = await embeddings.embedQuery(docs); -- embedQuery() //Dùng để embedding một câu hỏi. // thằng này chỉ nhận chuỗi thôi
+  return res.json({
+    message: "Thêm docs vector thành công",
+  });
 };
 
 module.exports.chat = async (req, res) => {

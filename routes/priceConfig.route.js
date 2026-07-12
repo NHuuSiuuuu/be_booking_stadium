@@ -7,7 +7,7 @@ const { adminMiddleWare } = require("../middleware/admin.middleware");
 
 router.post("/create",  controller.create);
 
-router.patch("/update", authMiddleWare, adminMiddleWare, controller.update);
+router.patch("/update",  controller.update);
 
 router.delete(
   "/delete/:id",

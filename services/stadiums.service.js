@@ -244,7 +244,7 @@ module.exports.create = async ({
       ],
     );
 
-    chatController.updateDocument(result.rows[0].id);
+    await chatController.updateDocument(result.rows[0].id);
     return {
       message: "SUCCESS",
       stadium: result.rows,
@@ -324,7 +324,7 @@ module.exports.update = async (id, data) => {
         id,
       ],
     );
-    chatController.updateDocument(id);
+    await chatController.updateDocument(id);
 
     return {
       message: "SUCCESS",
