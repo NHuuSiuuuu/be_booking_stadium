@@ -76,7 +76,7 @@ module.exports.index = async ({
       selectDistance = `
       ST_Distance(
       geom,
-      ST_SetSRID(ST_MakePoint($${index + 1}, $${index}), 4326)
+      ST_SetSRID(ST_MakePoint($${index + 1}, $${index}), 4326)::geography
       ) AS distance
       `;
 
