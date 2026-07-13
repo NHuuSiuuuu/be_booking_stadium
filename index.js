@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
-const port = 3636;
+const port = process.env.PORT || 3636;
 const cors = require("cors");
 const app = express();
 const { Pool } = require("pg");
@@ -13,7 +13,7 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: process.env.REACT_APP_URL || "*",
   },
 });
 
@@ -22,7 +22,7 @@ global.io = io;
 // Ban đầu cors * : cho phép tất cả trình duyệt đc vào - khi gửi cookiue vào trình duyệt - trình d nghĩ nguy hiểm -> chặn
 app.use(
   cors({
-    origin: process.env.REACT_APP_URL, // chỉ fe này mới đc vào + được gửi
+    origin: process.env.REACT_APP_URL || "*", // chỉ fe này mới đc vào + được gửi
     credentials: true, // cho phép fe gửi và nhận cookie
   }),
 );
