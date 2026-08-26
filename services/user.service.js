@@ -17,9 +17,16 @@ module.exports.get = async ({ filter, sort, limit, page, keyword }) => {
 
     if (filter) {
       const [key, value] = filter.split(":");
-      whereSql += ` AND ${key} = $${index}`;
-      values.push(value);
-      index++;
+      const allowedFilters = {
+        isadmin: "isadmin",
+        email: "email",
+        phone: "phone",
+      };
+      if (allowedFilters[key]) {
+        whereSql += ` AND ${allowedFilters[key]} = $${index}`;
+        values.push(value);
+        index++;
+      }
     }
 
     if (sort) {
@@ -33,7 +40,7 @@ module.exports.get = async ({ filter, sort, limit, page, keyword }) => {
       const direction = value === "desc" ? "DESC" : "ASC";
 
       if (allowedFields[key]) {
-        orderSql += ` ORDER BY ${key} ${direction}`;
+        orderSql += ` ORDER BY ${allowedFields[key]} ${direction}`;
       }
     } else {
       orderSql += ` ORDER BY fullname ASC `;
@@ -60,7 +67,7 @@ module.exports.get = async ({ filter, sort, limit, page, keyword }) => {
 
     const result = await pool.query(
       `
-      SELECT*
+      SELECT id, fullname, email, phone, isadmin, created_at
       ${whereSql} ${orderSql} ${limitSql} ${offsetSql}
       `,
       values,
@@ -92,13 +99,13 @@ module.exports.get = async ({ filter, sort, limit, page, keyword }) => {
 
 module.exports.create = async ({ fullName, email, password, phone }) => {
   try {
-    console.log(email);
     const checkUer = await pool.query(
       `
       SELECT email
       FROM users
-      WHERE email='${email}'
+      WHERE email = $1
       `,
+      [email],
     );
 
     if (checkUer.rows.length > 0) {
@@ -115,7 +122,7 @@ module.exports.create = async ({ fullName, email, password, phone }) => {
       `
       INSERT INTO users (fullName, email, password, phone)
       VALUES($1, $2, $3, $4)
-      RETURNING*
+      RETURNING id, fullname, email, phone, isadmin, created_at
       `,
       [fullName, email, hash, phone],
     );
@@ -130,13 +137,13 @@ module.exports.create = async ({ fullName, email, password, phone }) => {
 
 module.exports.createAdmin = async ({ fullName, email, password, phone }) => {
   try {
-    console.log(email);
     const checkUer = await pool.query(
       `
       SELECT email
       FROM users
-      WHERE email='${email}'
+      WHERE email = $1
       `,
+      [email],
     );
 
     if (checkUer.rows.length > 0) {
@@ -150,7 +157,7 @@ module.exports.createAdmin = async ({ fullName, email, password, phone }) => {
       `
       INSERT INTO users (fullName, email, password, phone, isadmin)
       VALUES($1, $2, $3, $4, $5)
-      RETURNING*
+      RETURNING id, fullname, email, phone, isadmin, created_at
       `,
       [fullName, email, hash, phone, true],
     );
@@ -170,7 +177,7 @@ module.exports.update = async ({ id }, data) => {
     // Kiểm tra có user này không
     const checkUer = await pool.query(
       `
-      SELECT id
+      SELECT id, password
       FROM users
       WHERE id=$1
       `,
@@ -210,12 +217,12 @@ module.exports.update = async ({ id }, data) => {
       `
       UPDATE users
       SET
-        fullName=$1,
-        email=$2,
-        password=$3,
-        phone=$4
+        fullName = COALESCE($1, fullName),
+        email = COALESCE($2, email),
+        password = COALESCE($3, password),
+        phone = COALESCE($4, phone)
       WHERE id=$5
-      RETURNING*
+      RETURNING id, fullname, email, phone, isadmin, created_at
       `,
       [fullName, email, hashPw, phone, id],
     );
@@ -230,14 +237,14 @@ module.exports.update = async ({ id }, data) => {
 
 module.exports.delete = async ({ id }) => {
   try {
-    console.log(id);
     const result = await pool.query(
       `
       DELETE 
       FROM users
-      WHERE id= ${id}
-      RETURNING*
+      WHERE id = $1
+      RETURNING id, fullname, email, phone, isadmin, created_at
       `,
+      [id],
     );
     return {
       result: result.rows[0],

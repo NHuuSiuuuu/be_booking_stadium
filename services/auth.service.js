@@ -5,13 +5,13 @@ const jwtService = require("../services/jwt.service");
 
 module.exports.login = async ({ email, password }) => {
   try {
-    console.log(email);
     const checkUer = await pool.query(
       `
       SELECT password ,isAdmin, id
       FROM users
-      WHERE email='${email}'
+      WHERE email = $1
       `,
+      [email],
     );
 
     if (checkUer.rows.length === 0) {
@@ -64,6 +64,13 @@ module.exports.getMe = async (id) => {
       [id],
     );
     // console.log("id là", result.rows[0]);
+    if (result.rows.length === 0) {
+      throw {
+        status: 404,
+        message: "User không tồn tại",
+      };
+    }
+
     return {
       user: {
         id: result.rows[0].id,

@@ -4,9 +4,9 @@ const express = require("express");
 const port = process.env.PORT || 3636;
 const cors = require("cors");
 const app = express();
-const { Pool } = require("pg");
 const cookieParser = require("cookie-parser");
 const routes = require("./routes/index.route");
+const { pool } = require("./pool");
 
 const http = require("http");
 const server = http.createServer(app);
@@ -29,21 +29,6 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // connectionString: chuỗi kết nối với database thay vì viết như bên dưới thằng này viết 1 dòng như này thôi
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
-
-// const pool = new Pool({
-//   user: "postgres",
-//   host: "localhost",
-//   database: "stadium_gis",
-//   password: "Admin",
-//   port: "5432",
-// });
 
 routes(app);
 

@@ -21,6 +21,8 @@ const transporter = nodemailer.createTransport({
 
 // Tạo booking
 module.exports.create = async (req) => {
+  const client = await pool.connect();
+  let committed = false;
   try {
     const {
       stadium_id,
@@ -33,15 +35,20 @@ module.exports.create = async (req) => {
       paymentMethod,
     } = req.body;
     const userId = req.user.id;
-    // console.log("data", data);
+
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `${stadium_id}:${price_config_id}:${booking_date}`,
+    ]);
+
     // Lấy giá
-    const price = await pool.query(
+    const price = await client.query(
       `
         SELECT price 
         FROM price_configs
-        WHERE id = $1
+        WHERE id = $1 AND stadium_id = $2
         `,
-      [price_config_id],
+      [price_config_id, stadium_id],
     );
 
     if (price.rows.length === 0) {
@@ -50,7 +57,7 @@ module.exports.create = async (req) => {
     const totalPrice = price.rows[0].price;
 
     // Kiểm tra trùng lịch - cùng sân, cùng ngày, cùng khung giờ
-    const conflict = await pool.query(
+    const conflict = await client.query(
       `
         SELECT id FROM bookings
         WHERE stadium_id = $1
@@ -66,7 +73,7 @@ module.exports.create = async (req) => {
     }
 
     // Tạo booking
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO bookings 
         (user_id, stadium_id, price_config_id, booking_date, full_name, email, phone, note, payment_method, total_price, payment_status, status)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'unpaid','pending')
@@ -86,7 +93,7 @@ module.exports.create = async (req) => {
     );
     const booking = result.rows[0];
     // Lấy sân + giờ
-    const detail = await pool.query(
+    const detail = await client.query(
       `
       SELECT s.name AS stadium_name, pc.start_time, pc.end_time
       FROM bookings b
@@ -97,13 +104,20 @@ module.exports.create = async (req) => {
       [booking.id],
     );
     const info = detail.rows[0];
-    const bookingLink = `https://fe-booking-stadium.vercel.app/booking/success/${booking.id}`;
+    await client.query("COMMIT");
+    committed = true;
+
+    const frontendUrl =
+      process.env.FRONTEND_URL ||
+      process.env.REACT_APP_URL ||
+      "https://fe-booking-stadium.vercel.app";
+    const bookingLink = `${frontendUrl}/booking/success/${booking.id}`;
     const finalPaymentMethod =
       booking.payment_method === "online"
         ? "Thanh toán online"
         : "Thanh toán tại sân";
     try {
-      transporter.sendMail({
+      await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: email,
         subject: "Đặt sân thành công",
@@ -153,43 +167,29 @@ module.exports.create = async (req) => {
     }
 
     if (result.rows[0].payment_method === "online") {
-      const booking = await pool.query(
-        `
-        SELECT* 
-        FROM bookings
-        WHERE id = $1
-        `,
-        [result.rows[0].id],
-      );
-      // console.log("booking", booking.rows[0].total_price);
-      // console.log("rows.length", booking.rows.length);
-      // console.log("booking.rows[0].length", booking.rows[0].length);
-
-      if (booking.rows.length === 0) {
-        throw new AppError("Booking không tồn tại", 404);
+      if (!process.env.VNPAY_TMN_CODE || !process.env.VNPAY_SECURE_SECRET) {
+        throw new AppError("Thiếu cấu hình VNPAY", 500);
       }
-      const vnpay = new VNPay({
-        // ⚡ Cấu hình bắt buộc
-        tmnCode: "TQ3L35SC",
-        secureSecret: "WFGSQJSZYSC75J3BW7J7YFCB05V4DOT6",
-        vnpayHost: "https://sandbox.vnpayment.vn",
 
-        // 🔧 Cấu hình tùy chọn
-        testMode: true, // Chế độ test
-        hashAlgorithm: "SHA512", // Thuật toán mã hóa
-        // enableLog: true, // Bật/tắt log
-        loggerFn: ignoreLogger, // Custom logger
+      const vnpay = new VNPay({
+        tmnCode: process.env.VNPAY_TMN_CODE,
+        secureSecret: process.env.VNPAY_SECURE_SECRET,
+        vnpayHost: process.env.VNPAY_HOST || "https://sandbox.vnpayment.vn",
+        testMode: process.env.VNPAY_TEST_MODE !== "false",
+        hashAlgorithm: "SHA512",
+        loggerFn: ignoreLogger,
       });
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
 
       const vnpayResponse = await vnpay.buildPaymentUrl({
-        vnp_Amount: booking.rows[0].total_price,
+        vnp_Amount: booking.total_price,
         vnp_IpAddr: req.ip,
-        vnp_TxnRef: booking.rows[0].id,
-        vnp_OrderInfo: `Thanh toán đơn đặt # ${booking.rows[0].id}`,
+        vnp_TxnRef: booking.id,
+        vnp_OrderInfo: `Thanh toán đơn đặt # ${booking.id}`,
         vnp_ReturnUrl:
-          "https://fe-booking-stadium.vercel.app/api/check-payment-vnpay",
+          process.env.VNPAY_RETURN_URL ||
+          `${frontendUrl}/api/check-payment-vnpay`,
         vnp_Locale: VnpLocale.VN,
         vnp_CreateDate: dateFormat(new Date()),
         vnp_ExpireDate: dateFormat(tomorrow),
@@ -199,7 +199,7 @@ module.exports.create = async (req) => {
         message: "Đặt sân thành công",
         payment_method: "online",
         vnpayResponse,
-        bookingId: booking.rows[0].id,
+        bookingId: booking.id,
       };
     }
 
@@ -209,7 +209,12 @@ module.exports.create = async (req) => {
       booking: result.rows[0],
     };
   } catch (e) {
+    if (!committed) {
+      await client.query("ROLLBACK");
+    }
     throw e;
+  } finally {
+    client.release();
   }
 };
 
@@ -633,7 +638,7 @@ module.exports.cancelBooking = async (id, userId) => {
   // Xử lý hủy sân khi thanh toán = online
   let paymentStatus = booking.payment_status;
   if (booking.payment_status === "paid") {
-    paymentStatus === "refunded";
+    paymentStatus = "refunded";
   }
   await pool.query(
     `

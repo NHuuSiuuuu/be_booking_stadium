@@ -2,10 +2,13 @@ const { pool } = require("../pool");
 const chatController = require("../controllers/chat.controller");
 
 module.exports.create = async ({ stadium_id, day_of_week, slots }) => {
+  const client = await pool.connect();
+  let committed = false;
   try {
+    await client.query("BEGIN");
     // console.log(slots)
     // Xóa config cũ tránh trùng ngày
-    await pool.query(
+    await client.query(
       `
        DELETE FROM price_configs 
        WHERE stadium_id = $1 AND day_of_week = $2
@@ -15,8 +18,7 @@ module.exports.create = async ({ stadium_id, day_of_week, slots }) => {
 
     const results = [];
     for (const slot of slots) {
-      console.log(slot);
-      const result = await pool.query(
+      const result = await client.query(
         `
        INSERT INTO price_configs (
         stadium_id, day_of_week, start_time, end_time, price
@@ -27,6 +29,8 @@ module.exports.create = async ({ stadium_id, day_of_week, slots }) => {
       );
       results.push(result.rows[0]);
     }
+    await client.query("COMMIT");
+    committed = true;
     await chatController.updateDocument(stadium_id);
 
     return {
@@ -34,7 +38,12 @@ module.exports.create = async ({ stadium_id, day_of_week, slots }) => {
       results,
     };
   } catch (e) {
+    if (!committed) {
+      await client.query("ROLLBACK");
+    }
     throw e;
+  } finally {
+    client.release();
   }
 };
 
@@ -85,9 +94,19 @@ module.exports.update = async ({
       `,
       [id],
     );
+    if (result.rows.length === 0 || stadiumResult.rows.length === 0) {
+      throw {
+        status: 404,
+        message: "Khung giờ không tồn tại",
+      };
+    }
     await client.query("COMMIT");
 
     await chatController.updateDocument(stadiumResult.rows[0].stadium_id);
+    return {
+      message: "Cập nhật thành công!",
+      result: result.rows[0],
+    };
   } catch (e) {
     await client.query("ROLLBACK"); // Lỗi thì hủy tất cả vừa làm
 
@@ -99,21 +118,17 @@ module.exports.update = async ({
 
 module.exports.delete = async ({ id }) => {
   try {
-    await pool.query(
+    const stadiumResult = await pool.query(
       ` DELETE 
         FROM price_configs
-        WHERE id=${id}
-      `,
-    );
-    const stadiumResult = await pool.query(
-      `
-      SELECT stadium_id 
-      FROM price_configs
-      where id= $1
+        WHERE id = $1
+        RETURNING stadium_id
       `,
       [id],
     );
-    await chatController.updateDocument(stadiumResult.rows[0].stadium_id);
+    if (stadiumResult.rows[0]) {
+      await chatController.updateDocument(stadiumResult.rows[0].stadium_id);
+    }
 
     return { message: "Xóa thành công!" };
   } catch (e) {

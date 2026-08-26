@@ -35,10 +35,14 @@ route.get("/check-payment-vnpay", authMiddleWare, async (req, res) => {
         UPDATE bookings
         SET payment_status = 'paid'
         WHERE id = $1
-        `,
+      `,
       [vnp_TxnRef],
     );
-    return res.redirect(`http://localhost:5173/booking/success/${vnp_TxnRef}`);
+    const frontendUrl =
+      process.env.FRONTEND_URL ||
+      process.env.REACT_APP_URL ||
+      "http://localhost:5173";
+    return res.redirect(`${frontendUrl}/booking/success/${vnp_TxnRef}`);
   } else if (vnp_ResponseCode === "24") {
     console.log("Hủy thanh toán");
     // return res.redirect(`/cart`);
