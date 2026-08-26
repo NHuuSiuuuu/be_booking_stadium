@@ -69,3 +69,13 @@ test("booking creation does not wait for email delivery before responding", () =
   );
   assert.match(bookingService, /transporter\s*\.\s*sendMail\([\s\S]*\.catch\(/);
 });
+
+test("cors allows normalized frontend origins and Vercel preview deployments", () => {
+  const index = read("index.js");
+
+  assert.match(index, /function normalizeOrigin/);
+  assert.match(index, /function isAllowedCorsOrigin/);
+  assert.match(index, /fe-booking-stadium/);
+  assert.equal(index.includes("vercel\\.app"), true);
+  assert.doesNotMatch(index, /origin:\s*process\.env\.REACT_APP_URL\s*\|\|\s*"\*"/);
+});
