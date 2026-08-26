@@ -4,6 +4,14 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
+function canManageUser(actor, targetUserId) {
+  if (!actor) {
+    return false;
+  }
+
+  return actor.isAdmin === true || String(actor.id) === String(targetUserId);
+}
+
 module.exports.get = async ({ filter, sort, limit, page, keyword }) => {
   try {
     // Limit
@@ -170,8 +178,12 @@ module.exports.createAdmin = async ({ fullName, email, password, phone }) => {
   }
 };
 
-module.exports.update = async ({ id }, data) => {
+module.exports.update = async ({ id }, data, actor) => {
   try {
+    if (!canManageUser(actor, id)) {
+      throw new AppError("Không có quyền", 403);
+    }
+
     const { fullName, email, password, phone } = data;
 
     // Kiểm tra có user này không
@@ -235,8 +247,12 @@ module.exports.update = async ({ id }, data) => {
   }
 };
 
-module.exports.delete = async ({ id }) => {
+module.exports.delete = async ({ id }, actor) => {
   try {
+    if (!canManageUser(actor, id)) {
+      throw new AppError("Không có quyền", 403);
+    }
+
     const result = await pool.query(
       `
       DELETE 

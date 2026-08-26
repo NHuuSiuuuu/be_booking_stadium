@@ -15,7 +15,7 @@ module.exports.get = async (req, res) => {
   try {
     // console.log("req", req.query)
     const result = await BookingService.get(req.query);
-    return res.status(201).json(result);
+    return res.status(200).json(result);
   } catch (e) {
     return res.status(e.status || 500).json({
       message: e.message || e,
@@ -98,6 +98,17 @@ module.exports.getMyBookings = async (req, res) => {
     const order = await BookingService.getMyBookings(userId);
 
     return res.status(200).json(order);
+  } catch (e) {
+    return res.status(e.status || 500).json({
+      message: e.message || "Lỗi server",
+    });
+  }
+};
+
+module.exports.checkPaymentVNPay = async (req, res) => {
+  try {
+    const result = await BookingService.checkPaymentVNPay(req.query);
+    return res.redirect(result.redirectUrl);
   } catch (e) {
     return res.status(e.status || 500).json({
       message: e.message || "Lỗi server",

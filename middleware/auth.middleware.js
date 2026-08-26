@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 const JwtService = require("../services/jwt.service");
+const { getAuthCookieOptions } = require("../utils/cookieOptions");
 
 dotenv.config();
 
@@ -40,19 +41,17 @@ module.exports.authMiddleWare = async (req, res, next) => {
     });
 
     // Xét lại cookie
-    res.cookie("access_token", newAccessToken, {
-      httpOnly: true, // Chặn truy cập từ JavaScript (bảo mật hơn)
-      secure: false, // Chỉ gửi trên HTTPS (để đảm bảo an toàn)
-      sameSite: "Lax", // Chống tấn công CSRF
-      maxAge: 15 * 60 * 1000, // 15 phút
-    });
+    res.cookie(
+      "access_token",
+      newAccessToken,
+      getAuthCookieOptions({ maxAge: 15 * 60 * 1000 }),
+    );
     // Set lại refresh_token để gia hạn cookie
-    res.cookie("refresh_token", refresh_token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "Strict",
-      maxAge: 365 * 24 * 60 * 60 * 1000, // 365 ngày
-    });
+    res.cookie(
+      "refresh_token",
+      refresh_token,
+      getAuthCookieOptions({ maxAge: 7 * 24 * 60 * 60 * 1000 }),
+    );
 
     req.user = decodedRefresh;
 
