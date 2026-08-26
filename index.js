@@ -12,11 +12,17 @@ const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
 
+const defaultAllowedOrigins = [
+  "https://booking-stadium.vercel.app",
+  "https://fe-booking-stadium.vercel.app",
+];
+
 function normalizeOrigin(origin) {
   return origin ? origin.replace(/\/+$/, "") : origin;
 }
 
 const configuredOrigins = [
+  ...defaultAllowedOrigins,
   process.env.REACT_APP_URL,
   process.env.FRONTEND_URL,
 ]

@@ -76,6 +76,7 @@ test("cors allows normalized frontend origins and Vercel preview deployments", (
   assert.match(index, /function normalizeOrigin/);
   assert.match(index, /function isAllowedCorsOrigin/);
   assert.match(index, /fe-booking-stadium/);
+  assert.match(index, /booking-stadium\.vercel\.app/);
   assert.equal(index.includes("vercel\\.app"), true);
   assert.doesNotMatch(index, /origin:\s*process\.env\.REACT_APP_URL\s*\|\|\s*"\*"/);
 });
