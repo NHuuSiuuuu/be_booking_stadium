@@ -116,8 +116,8 @@ module.exports.create = async (req) => {
       booking.payment_method === "online"
         ? "Thanh toán online"
         : "Thanh toán tại sân";
-    try {
-      await transporter.sendMail({
+    transporter
+      .sendMail({
         from: process.env.EMAIL_USER,
         to: email,
         subject: "Đặt sân thành công",
@@ -161,10 +161,10 @@ module.exports.create = async (req) => {
           </div>
         </div>
         `,
+      })
+      .catch((err) => {
+        console.log("Mail lỗi:", err.message);
       });
-    } catch (err) {
-      console.log("Mail lỗi:", err.message);
-    }
 
     if (result.rows[0].payment_method === "online") {
       if (!process.env.VNPAY_TMN_CODE || !process.env.VNPAY_SECURE_SECRET) {
