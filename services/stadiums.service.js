@@ -101,7 +101,6 @@ module.exports.index = async ({
     // Nếu không phải tính khoảng cách
     if (!orderSql) {
       if (sort) {
-        console.log(sort);
         const [key, value] = sort.split(":");
         // Các trường sort
         const allowedFields = ["name", "address", "district_id"];
@@ -164,7 +163,6 @@ module.exports.index = async ({
     );
 
     const total = totalStadium?.rows[0].total;
-    console.log("total", total);
     return {
       message: "SUCCESS",
       stadiums: result.rows,
@@ -191,10 +189,11 @@ module.exports.create = async ({
   utility,
 }) => {
   try {
-    let slug = slugify(name, {
+    const baseSlug = slugify(name, {
       lower: true,
       strict: true,
     });
+    let slug = baseSlug;
     let count = 1;
     while (true) {
       const check = await pool.query(
@@ -202,7 +201,8 @@ module.exports.create = async ({
         [slug],
       );
       if (check.rows.length === 0) break;
-      slug = `${slug}-${count + 1}`;
+      count++;
+      slug = `${baseSlug}-${count}`;
     }
 
     const utilityParse =
@@ -271,18 +271,20 @@ module.exports.update = async (id, data) => {
     } = data;
 
     // Tạo slug
-    let slug = slugify(name, {
+    const baseSlug = slugify(name, {
       lower: true,
       strict: true,
     });
+    let slug = baseSlug;
     let count = 1;
     while (true) {
       const check = await pool.query(
-        "SELECT id FROM stadiums WHERE slug = $1",
-        [slug],
+        "SELECT id FROM stadiums WHERE slug = $1 AND id != $2",
+        [slug, id],
       );
       if (check.rows.length === 0) break;
-      slug = `${slug}-${count + 1}`;
+      count++;
+      slug = `${baseSlug}-${count}`;
     }
     const utilityParse =
       typeof utility === "string" ? JSON.parse(utility) : utility;
@@ -375,8 +377,9 @@ module.exports.detail = async (id) => {
     const result = await pool.query(
       ` SELECT* 
         FROM stadiums
-        WHERE id=${id}
+        WHERE id = $1
       `,
+      [id],
     );
     return result.rows;
   } catch (e) {

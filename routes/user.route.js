@@ -2,11 +2,12 @@ const express = require("express");
 const router = express.Router();
 const controller = require(`../controllers/user.controller`);
 const { authMiddleWare } = require("../middleware/auth.middleware");
+const { adminMiddleWare } = require("../middleware/admin.middleware");
 
 router.get("/", authMiddleWare, controller.get);
 router.post("/create", controller.create);
 
-router.post("/create-admin", controller.createAdmin);
+router.post("/create-admin", authMiddleWare, adminMiddleWare, controller.createAdmin);
 
 router.patch("/update/:id", authMiddleWare, controller.update);
 

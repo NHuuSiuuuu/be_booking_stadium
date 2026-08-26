@@ -7,7 +7,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test test/*.test.js",
     "start": "nodemon --inspect index.js"
   },
   "dependencies": {
@@ -23,7 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "langchain": "^1.5.3",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^9.0.5",
     "pg": "^8.20.0",
     "pgvector": "^0.2.1",
     "slugify": "^1.6.6",
