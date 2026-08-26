@@ -58,3 +58,14 @@ test("runtime config is read from environment instead of duplicated or hard-code
   assert.match(bookingService, /process\.env\.VNPAY_TMN_CODE/);
   assert.match(bookingService, /process\.env\.VNPAY_SECURE_SECRET/);
 });
+
+test("booking creation does not wait for email delivery before responding", () => {
+  const bookingService = read("services/bookings.service.js");
+
+  assert.equal(
+    /await\s+transporter\.sendMail/.test(bookingService),
+    false,
+    "booking create should not await SMTP email delivery after the booking is committed",
+  );
+  assert.match(bookingService, /transporter\s*\.\s*sendMail\([\s\S]*\.catch\(/);
+});
