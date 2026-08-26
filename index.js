@@ -11,20 +11,57 @@ const { pool } = require("./pool");
 const http = require("http");
 const server = http.createServer(app);
 const { Server } = require("socket.io");
+
+function normalizeOrigin(origin) {
+  return origin ? origin.replace(/\/+$/, "") : origin;
+}
+
+const configuredOrigins = [
+  process.env.REACT_APP_URL,
+  process.env.FRONTEND_URL,
+]
+  .flatMap((value) => (value ? value.split(",") : []))
+  .map((value) => normalizeOrigin(value.trim()))
+  .filter(Boolean);
+
+function isVercelPreviewOrigin(origin) {
+  return /^https:\/\/fe-booking-stadium-[a-z0-9-]+.*\.vercel\.app$/.test(origin);
+}
+
+function isAllowedCorsOrigin(origin) {
+  if (!origin) return true;
+
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  return (
+    configuredOrigins.includes(normalizedOrigin) ||
+    isVercelPreviewOrigin(normalizedOrigin)
+  );
+}
+
+function corsOrigin(origin, callback) {
+  if (isAllowedCorsOrigin(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  callback(new Error("Not allowed by CORS"));
+}
+
+const corsOptions = {
+  origin: corsOrigin,
+  credentials: true,
+};
+
 const io = new Server(server, {
-  cors: {
-    origin: process.env.REACT_APP_URL || "*",
-  },
+  cors: corsOptions,
 });
 
 global.io = io;
 
 // Ban đầu cors * : cho phép tất cả trình duyệt đc vào - khi gửi cookiue vào trình duyệt - trình d nghĩ nguy hiểm -> chặn
 app.use(
-  cors({
-    origin: process.env.REACT_APP_URL || "*", // chỉ fe này mới đc vào + được gửi
-    credentials: true, // cho phép fe gửi và nhận cookie
-  }),
+  cors(corsOptions),
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
