@@ -19,6 +19,33 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function getFrontendUrl() {
+  return (
+    process.env.FRONTEND_URL ||
+    process.env.REACT_APP_URL ||
+    "https://fe-booking-stadium.vercel.app"
+  );
+}
+
+function validateVNPayConfig() {
+  if (!process.env.VNPAY_TMN_CODE || !process.env.VNPAY_SECURE_SECRET) {
+    throw new AppError("Thiếu cấu hình VNPAY", 500);
+  }
+}
+
+function createVNPayClient() {
+  validateVNPayConfig();
+
+  return new VNPay({
+    tmnCode: process.env.VNPAY_TMN_CODE,
+    secureSecret: process.env.VNPAY_SECURE_SECRET,
+    vnpayHost: process.env.VNPAY_HOST || "https://sandbox.vnpayment.vn",
+    testMode: process.env.VNPAY_TEST_MODE !== "false",
+    hashAlgorithm: "SHA512",
+    loggerFn: ignoreLogger,
+  });
+}
+
 // Tạo booking
 module.exports.create = async (req) => {
   const client = await pool.connect();
@@ -35,6 +62,10 @@ module.exports.create = async (req) => {
       paymentMethod,
     } = req.body;
     const userId = req.user.id;
+    const normalizedPaymentMethod = paymentMethod ?? "cash";
+    if (normalizedPaymentMethod === "online") {
+      validateVNPayConfig();
+    }
 
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
@@ -87,7 +118,7 @@ module.exports.create = async (req) => {
         email,
         phone,
         note ?? null,
-        paymentMethod ?? "cash",
+        normalizedPaymentMethod,
         totalPrice,
       ],
     );
@@ -107,10 +138,7 @@ module.exports.create = async (req) => {
     await client.query("COMMIT");
     committed = true;
 
-    const frontendUrl =
-      process.env.FRONTEND_URL ||
-      process.env.REACT_APP_URL ||
-      "https://fe-booking-stadium.vercel.app";
+    const frontendUrl = getFrontendUrl();
     const bookingLink = `${frontendUrl}/booking/success/${booking.id}`;
     const finalPaymentMethod =
       booking.payment_method === "online"
@@ -167,18 +195,7 @@ module.exports.create = async (req) => {
       });
 
     if (result.rows[0].payment_method === "online") {
-      if (!process.env.VNPAY_TMN_CODE || !process.env.VNPAY_SECURE_SECRET) {
-        throw new AppError("Thiếu cấu hình VNPAY", 500);
-      }
-
-      const vnpay = new VNPay({
-        tmnCode: process.env.VNPAY_TMN_CODE,
-        secureSecret: process.env.VNPAY_SECURE_SECRET,
-        vnpayHost: process.env.VNPAY_HOST || "https://sandbox.vnpayment.vn",
-        testMode: process.env.VNPAY_TEST_MODE !== "false",
-        hashAlgorithm: "SHA512",
-        loggerFn: ignoreLogger,
-      });
+      const vnpay = createVNPayClient();
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -436,9 +453,17 @@ module.exports.holdSlots = async (
   price_config_id,
   socket_id,
 ) => {
+  const client = await pool.connect();
+  let committed = false;
+  let oldSlotIdToRelease;
   try {
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `${stadium_id}:${price_config_id}:${date}`,
+    ]);
+
     // Xóa những hold có expires_at < NOW()
-    await pool.query(
+    await client.query(
       `
       DELETE
       FROM booking_holds
@@ -451,24 +476,24 @@ module.exports.holdSlots = async (
 
     let oldHold;
     if (socket_id) {
-      oldHold = await pool.query(
+      oldHold = await client.query(
         `SELECT price_config_id FROM booking_holds 
        WHERE stadium_id = $1 AND booking_date = $2 AND socket_id = $3`,
         [stadium_id, date, socket_id],
       );
     }
-    if (oldHold.rows.length > 0) {
+    if (oldHold?.rows.length > 0) {
       const oldSlotId = oldHold.rows[0].price_config_id;
       if (socket_id) {
-        await pool.query(
+        await client.query(
           `DELETE FROM booking_holds
-         WHERE price_config_id = $1 AND socket_id = $2`,
-          [oldSlotId, socket_id],
+         WHERE stadium_id = $1
+         AND booking_date = $2
+         AND price_config_id = $3
+         AND socket_id = $4`,
+          [stadium_id, date, oldSlotId, socket_id],
         );
-        // Báo cho frontend mở khóa slot nào
-        io.to(`stadium-${stadium_id}`).emit("sold-released", {
-          price_config_id: oldSlotId,
-        });
+        oldSlotIdToRelease = oldSlotId;
         console.log(`Chạy đến đây: stadium-${stadium_id} `);
       }
     }
@@ -477,7 +502,7 @@ module.exports.holdSlots = async (
 
     // Kiểm tra slot đấy đã được booking chưa <ktra sân này, ngày này, giờ này>
     // Slot đã đặt rồi thì không cho giữ nữa
-    const booked = await pool.query(
+    const booked = await client.query(
       `
         SELECT price_config_id 
         FROM bookings
@@ -495,7 +520,7 @@ module.exports.holdSlots = async (
     }
 
     // TH slot chưa được đặt thì kiểm tra xem có ai đang giữ tạm thời không
-    const holding = await pool.query(
+    const holding = await client.query(
       `
         SELECT id
         FROM booking_holds
@@ -513,7 +538,7 @@ module.exports.holdSlots = async (
     }
 
     // Nếu slot đấy không được giữ
-    await pool.query(
+    const holdResult = await client.query(
       `
     INSERT INTO booking_holds(
       stadium_id,
@@ -529,32 +554,49 @@ module.exports.holdSlots = async (
       NOW() + INTERVAL '10 seconds',
       $4
     )
+    RETURNING id
     `,
       [stadium_id, date, price_config_id, socket_id],
     );
+    const holdId = holdResult.rows[0].id;
+    await client.query("COMMIT");
+    committed = true;
+
+    if (oldSlotIdToRelease) {
+      // Báo cho frontend mở khóa slot nào
+      io.to(`stadium-${stadium_id}`).emit("sold-released", {
+        price_config_id: oldSlotIdToRelease,
+      });
+    }
 
     // Gửi event sold-held cho tất cả socket trong roomstadium-${stadium_id}
     io.to(`stadium-${stadium_id}`).emit("sold-held", {
       price_config_id,
     });
 
-    setTimeout(async () => {
+    setTimeout(() => {
       // Xóa những hold có expires_at < NOW()
-      await pool.query(
-        `
-      DELETE
-      FROM booking_holds
-      WHERE stadium_id = $1
-      AND booking_date = $2
-      AND price_config_id = $3
-      `,
-        [stadium_id, date, price_config_id],
-      );
-
-      // Sau phát ra sự kiện bỏ giữ
-      io.to(`stadium-${stadium_id}`).emit("sold-released", {
-        price_config_id,
-      });
+      pool
+        .query(
+          `
+        DELETE
+        FROM booking_holds
+        WHERE id = $1
+        AND expires_at <= NOW()
+        `,
+          [holdId],
+        )
+        .then((deleted) => {
+          if (deleted.rowCount > 0) {
+            // Sau phát ra sự kiện bỏ giữ
+            io.to(`stadium-${stadium_id}`).emit("sold-released", {
+              price_config_id,
+            });
+          }
+        })
+        .catch((err) => {
+          console.log("Xóa hold lỗi:", err.message);
+        });
     }, 10000);
 
     // console.log("io mo", io.id);
@@ -562,7 +604,12 @@ module.exports.holdSlots = async (
       message: "success",
     };
   } catch (e) {
+    if (!committed) {
+      await client.query("ROLLBACK");
+    }
     throw e;
+  } finally {
+    client.release();
   }
 };
 
@@ -652,6 +699,86 @@ module.exports.cancelBooking = async (id, userId) => {
   return {
     status: "OK",
     message: "Huỷ sân thành công",
+  };
+};
+
+module.exports.checkPaymentVNPay = async (query) => {
+  const vnp_TxnRef = query.vnp_TxnRef;
+  if (!vnp_TxnRef) {
+    throw new AppError("Thiếu mã đơn thanh toán", 400);
+  }
+
+  const vnpay = createVNPayClient();
+  const verification = vnpay.verifyReturnUrl(query);
+
+  if (!verification.isVerified) {
+    throw new AppError("Dữ liệu thanh toán không hợp lệ", 400);
+  }
+
+  const bookingRes = await pool.query(
+    `
+    SELECT id, total_price, payment_method, payment_status, status
+    FROM bookings
+    WHERE id = $1
+    `,
+    [vnp_TxnRef],
+  );
+
+  if (bookingRes.rows.length === 0) {
+    throw new AppError("Booking không tồn tại", 404);
+  }
+
+  const booking = bookingRes.rows[0];
+  if (booking.payment_method !== "online") {
+    throw new AppError("Booking không phải thanh toán online", 400);
+  }
+
+  const returnedAmount = Number(query.vnp_Amount);
+  const expectedAmount = Number(booking.total_price);
+
+  if (
+    Number.isFinite(returnedAmount) &&
+    returnedAmount !== expectedAmount &&
+    returnedAmount / 100 !== expectedAmount
+  ) {
+    throw new AppError("Số tiền thanh toán không khớp", 400);
+  }
+
+  let updateResult;
+  if (verification.isSuccess) {
+    updateResult = await pool.query(
+      `
+      UPDATE bookings
+      SET payment_status = 'paid'
+      WHERE id = $1
+      AND payment_method = 'online'
+      AND payment_status = 'unpaid'
+      AND status = 'pending'
+      `,
+      [vnp_TxnRef],
+    );
+  } else {
+    updateResult = await pool.query(
+      `
+      UPDATE bookings
+      SET status = 'cancelled'
+      WHERE id = $1
+      AND payment_method = 'online'
+      AND payment_status = 'unpaid'
+      AND status = 'pending'
+      `,
+      [vnp_TxnRef],
+    );
+  }
+
+  if (updateResult.rowCount === 0) {
+    return {
+      redirectUrl: `${getFrontendUrl()}/booking/success/${vnp_TxnRef}`,
+    };
+  }
+
+  return {
+    redirectUrl: `${getFrontendUrl()}/booking/success/${vnp_TxnRef}`,
   };
 };
 

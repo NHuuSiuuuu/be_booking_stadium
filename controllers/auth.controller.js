@@ -1,23 +1,20 @@
 const AuthService = require("../services/auth.service");
+const { getAuthCookieOptions } = require("../utils/cookieOptions");
 
 module.exports.login = async (req, res) => {
   try {
     const result = await AuthService.login(req.body);
     res
-      .cookie("access_token", result.access_token, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "Lax",
-        path: "/",
-        maxAge: 15 * 60 * 1000, // 15 phút
-      })
-      .cookie("refresh_token", result.refresh_token, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "Lax",
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
-      });
+      .cookie(
+        "access_token",
+        result.access_token,
+        getAuthCookieOptions({ maxAge: 15 * 60 * 1000 }),
+      )
+      .cookie(
+        "refresh_token",
+        result.refresh_token,
+        getAuthCookieOptions({ maxAge: 7 * 24 * 60 * 60 * 1000 }),
+      );
 
     return res.status(200).json(result);
   } catch (e) {
@@ -30,18 +27,8 @@ module.exports.login = async (req, res) => {
 module.exports.logout = async (req, res) => {
   try {
     res
-      .clearCookie("access_token", {
-        httpOnly: true,
-        secure: false,
-        sameSite: "Lax",
-        path: "/",
-      })
-      .clearCookie("refresh_token", {
-        httpOnly: true,
-        secure: false,
-        sameSite: "Lax",
-        path: "/",
-      });
+      .clearCookie("access_token", getAuthCookieOptions())
+      .clearCookie("refresh_token", getAuthCookieOptions());
 
     return res.status(200).json({
       status: "OK",

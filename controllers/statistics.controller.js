@@ -7,7 +7,7 @@ module.exports.overview = async (req, res) => {
   try {
     // console.log("req", req.query)
     const result = await StatisticService.overview();
-    return res.status(201).json(result);
+    return res.status(200).json(result);
   } catch (e) {
     return res.status(e.status || 500).json({
       message: e.message || e,
@@ -20,7 +20,7 @@ module.exports.revenueByMonth = async (req, res) => {
   try {
     // console.log("req", req.query)
     const result = await StatisticService.revenueByMonth();
-    return res.status(201).json(result);
+    return res.status(200).json(result);
   } catch (e) {
     return res.status(e.status || 500).json({
       message: e.message || e,
@@ -34,7 +34,7 @@ module.exports.bookingByMonth = async (req, res) => {
   try {
     // console.log("req", req.query)
     const result = await StatisticService.bookingByMonth();
-    return res.status(201).json(result);
+    return res.status(200).json(result);
   } catch (e) {
     return res.status(e.status || 500).json({
       message: e.message || e,
@@ -48,11 +48,10 @@ module.exports.topStadiums = async (req, res) => {
   try {
     // console.log("req", req.query)
     const result = await StatisticService.topStadiums();
-    return res.status(201).json(result);
+    return res.status(200).json(result);
   } catch (e) {
     return res.status(e.status || 500).json({
       message: e.message || e,
     });
   }
 };
-

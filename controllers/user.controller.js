@@ -41,7 +41,7 @@ module.exports.update = async (req, res) => {
   try {
     const id = req.params;
     const data = req.body;
-    const result = await UserService.update(id, data);
+    const result = await UserService.update(id, data, req.user);
     return res.status(200).json(result);
   } catch (e) {
     return res.status(e.status || 500).json({
@@ -53,7 +53,7 @@ module.exports.update = async (req, res) => {
 module.exports.delete = async (req, res) => {
   try {
     const id = req.params;
-    const result = await UserService.delete(id);
+    const result = await UserService.delete(id, req.user);
     return res.status(200).json(result);
   } catch (e) {
     return res.status(e.status || 500).json({
