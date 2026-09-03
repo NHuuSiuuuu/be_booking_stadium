@@ -1,0 +1,62 @@
+const ConversationService = require("../services/conversations.service");
+
+module.exports.getOrCreate = async (req, res, next) => {
+  try {
+    const result = await ConversationService.getOrCreate({
+      userId: req.user.id,
+      stadiumId: req.body.stadium_id,
+    });
+    res.json({ message: "success", result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.list = async (req, res, next) => {
+  try {
+    const result = await ConversationService.list(req.user);
+    res.json({ message: "success", result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.getMessages = async (req, res, next) => {
+  try {
+    const result = await ConversationService.getMessages(req.params.id, req.user);
+    res.json({ message: "success", result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.sendMessage = async (req, res, next) => {
+  try {
+    const result = await ConversationService.sendMessage(
+      req.params.id,
+      req.user,
+      req.body.content,
+    );
+    res.json({ message: "success", result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.markRead = async (req, res, next) => {
+  try {
+    const result = await ConversationService.markRead(req.params.id, req.user);
+    res.json({ message: "success", result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports.close = async (req, res, next) => {
+  try {
+    const result = await ConversationService.close(req.params.id, req.user);
+    res.json({ message: "success", result });
+  } catch (err) {
+    next(err);
+  }
+};

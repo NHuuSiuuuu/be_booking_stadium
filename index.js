@@ -5,6 +5,7 @@ const port = process.env.PORT || 3636;
 const cors = require("cors");
 const app = express();
 const cookieParser = require("cookie-parser");
+const jwt = require("jsonwebtoken");
 const routes = require("./routes/index.route");
 const { pool } = require("./pool");
 
@@ -65,6 +66,50 @@ const io = new Server(server, {
 
 global.io = io;
 
+function parseSocketCookies(cookieHeader = "") {
+  return cookieHeader.split(";").reduce((cookies, item) => {
+    const [rawKey, ...rawValue] = item.trim().split("=");
+    if (!rawKey) return cookies;
+
+    cookies[rawKey] = decodeURIComponent(rawValue.join("="));
+    return cookies;
+  }, {});
+}
+
+function getSocketUser(socket) {
+  const cookies = parseSocketCookies(socket.handshake.headers.cookie || "");
+  const token = cookies.access_token || cookies.refresh_token;
+
+  if (!token) return null;
+
+  try {
+    return jwt.verify(
+      token,
+      cookies.access_token ? process.env.ACCESS_TOKEN : process.env.REFRESH_TOKEN,
+    );
+  } catch (err) {
+    return null;
+  }
+}
+
+async function canSocketJoinConversation(socket, conversationId) {
+  const user = socket.data.user;
+
+  if (!user) return false;
+  if (user.isAdmin === true) return true;
+
+  const result = await pool.query(
+    `
+    SELECT user_id
+    FROM conversations
+    WHERE id = $1
+    `,
+    [conversationId],
+  );
+
+  return String(result.rows[0]?.user_id) === String(user.id);
+}
+
 // Ban đầu cors * : cho phép tất cả trình duyệt đc vào - khi gửi cookiue vào trình duyệt - trình d nghĩ nguy hiểm -> chặn
 app.use(
   cors(corsOptions),
@@ -91,10 +136,33 @@ app.use((err, req, res, next) => {
 });
 
 io.on("connection", (socket) => {
+  socket.data.user = getSocketUser(socket);
   console.log("Một user đã nết nối", socket.id);
 
   socket.on("join-stadium", (stadiumId) => {
     socket.join(`stadium-${stadiumId}`);
+  });
+
+  socket.on("chat:join-conversation", async (conversationId) => {
+    if (!(await canSocketJoinConversation(socket, conversationId))) {
+      socket.emit("chat:error", { message: "Không có quyền" });
+      return;
+    }
+
+    socket.join(`conversation:${conversationId}`);
+  });
+
+  socket.on("chat:leave-conversation", (conversationId) => {
+    socket.leave(`conversation:${conversationId}`);
+  });
+
+  socket.on("chat:join-admin", () => {
+    if (socket.data.user?.isAdmin !== true) {
+      socket.emit("chat:error", { message: "Không có quyền" });
+      return;
+    }
+
+    socket.join("admin:messages");
   });
 
   socket.on("disconnect", () => {

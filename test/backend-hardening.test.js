@@ -71,6 +71,54 @@ test("holding a slot is protected by a transaction lock and timeout deletes only
   assert.match(service, /WHERE id = \$1\s+AND expires_at <= NOW\(\)/);
 });
 
+test("human chat service derives sender role and restricts user access", () => {
+  const service = read("services/conversations.service.js");
+
+  assert.match(service, /function\s+getSenderRole\(actor\)/);
+  assert.match(service, /actor\.isAdmin\s*===\s*true\s*\?\s*"admin"\s*:\s*"user"/);
+  assert.match(service, /function\s+canReadConversation\(actor,\s*conversation\)/);
+  assert.match(service, /actor\.isAdmin\s*===\s*true/);
+  assert.match(service, /String\(conversation\.user_id\)\s*===\s*String\(actor\.id\)/);
+  assert.match(service, /function\s+validateContent\(content\)/);
+  assert.match(service, /trim\(\)/);
+  assert.doesNotMatch(service, /sender_role\s*=\s*req\.body/);
+});
+
+test("socket chat events use dedicated chat rooms and do not reuse booking events", () => {
+  const index = read("index.js");
+  const service = read("services/conversations.service.js");
+
+  assert.match(index, /chat:join-conversation/);
+  assert.match(index, /conversation:\$\{conversationId\}/);
+  assert.match(index, /chat:join-admin/);
+  assert.match(index, /admin:messages/);
+  assert.match(service, /global\.io/);
+  assert.match(service, /chat:message-created/);
+  assert.match(service, /chat:conversation-updated/);
+});
+
+test("socket chat rooms require authenticated users with conversation access", () => {
+  const index = read("index.js");
+
+  assert.match(index, /function\s+getSocketUser\(socket\)/);
+  assert.match(index, /jwt\.verify\(\s*token/);
+  assert.match(index, /async function\s+canSocketJoinConversation/);
+  assert.match(index, /SELECT user_id\s+FROM conversations\s+WHERE id = \$1/);
+  assert.match(index, /String\(result\.rows\[0\]\?\.user_id\)\s*===\s*String\(user\.id\)/);
+  assert.match(index, /socket\.data\.user\?\.isAdmin\s*!==\s*true/);
+  assert.match(index, /socket\.emit\("chat:error",\s*\{\s*message:\s*"Không có quyền"\s*\}\)/);
+});
+
+test("human chat realtime updates include user and stadium metadata", () => {
+  const service = read("services/conversations.service.js");
+
+  assert.match(service, /async function\s+getConversationDetail\(conversationId\)/);
+  assert.match(service, /u\.fullname AS user_fullname/);
+  assert.match(service, /s\.name AS stadium_name/);
+  assert.match(service, /const updatedConversation = await getConversationDetail\(conversationId\)/);
+  assert.match(service, /emitMessageCreated\(conversationId,\s*message,\s*updatedConversation\)/);
+});
+
 test("holdSlots succeeds with no previous hold and schedules cleanup for the created hold", async () => {
   const queries = [];
   const client = {
