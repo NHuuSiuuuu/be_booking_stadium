@@ -27,6 +27,10 @@ test("sensitive routes require authentication and admin authorization", () => {
     userRoutes,
     /router\.post\("\/create-admin",\s*authMiddleWare,\s*adminMiddleWare,\s*controller\.createAdmin\s*\)/s,
   );
+  assert.match(
+    userRoutes,
+    /router\.get\("\/detail\/:id",\s*authMiddleWare,\s*controller\.detail\s*\)/s,
+  );
 
   const priceRoutes = read("routes/priceConfig.route.js");
   assert.match(
@@ -47,6 +51,34 @@ test("sensitive routes require authentication and admin authorization", () => {
     chatRoutes,
     /route\.post\(`\/update-docs-stadium\/:stadiumId`,\s*authMiddleWare,\s*adminMiddleWare,\s*ChatController\.updateDocument\s*\)/s,
   );
+});
+
+test("user detail endpoint returns one account through the user service", () => {
+  const controller = read("controllers/user.controller.js");
+  const service = read("services/user.service.js");
+
+  assert.match(controller, /module\.exports\.detail\s*=\s*async\s*\(req,\s*res\)\s*=>/);
+  assert.match(controller, /UserService\.detail\(id,\s*req\.user\)/);
+  assert.match(service, /module\.exports\.detail\s*=\s*async\s*\(\{\s*id\s*\},\s*actor\)\s*=>/);
+  assert.match(service, /canManageUser\(actor,\s*id\)/);
+  assert.match(service, /SELECT id, fullname, email, phone, isadmin, status, created_at/);
+  assert.match(service, /WHERE id = \$1/);
+});
+
+test("user management responses include account status and creation date", () => {
+  const service = read("services/user.service.js");
+
+  assert.match(service, /allowedFilters\s*=\s*\{[\s\S]*status:\s*"status"/);
+  assert.match(service, /SELECT id, fullname, email, phone, isadmin, status, created_at/);
+  assert.match(service, /RETURNING id, fullname, email, phone, isadmin, status, created_at/);
+});
+
+test("user update can change role and active status", () => {
+  const service = read("services/user.service.js");
+
+  assert.match(service, /const\s*\{\s*fullName,\s*email,\s*password,\s*phone,\s*isadmin,\s*status\s*\}\s*=\s*data/);
+  assert.match(service, /isadmin = COALESCE\(\$5, isadmin\)/);
+  assert.match(service, /status = COALESCE\(\$6, status\)/);
 });
 
 test("runtime config is read from environment instead of duplicated or hard-coded", () => {

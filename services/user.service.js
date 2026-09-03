@@ -27,12 +27,13 @@ module.exports.get = async ({ filter, sort, limit, page, keyword }) => {
       const [key, value] = filter.split(":");
       const allowedFilters = {
         isadmin: "isadmin",
+        status: "status",
         email: "email",
         phone: "phone",
       };
       if (allowedFilters[key]) {
         whereSql += ` AND ${allowedFilters[key]} = $${index}`;
-        values.push(value);
+        values.push(["isadmin", "status"].includes(key) ? value === "true" : value);
         index++;
       }
     }
@@ -75,7 +76,7 @@ module.exports.get = async ({ filter, sort, limit, page, keyword }) => {
 
     const result = await pool.query(
       `
-      SELECT id, fullname, email, phone, isadmin, created_at
+      SELECT id, fullname, email, phone, isadmin, status, created_at
       ${whereSql} ${orderSql} ${limitSql} ${offsetSql}
       `,
       values,
@@ -130,7 +131,7 @@ module.exports.create = async ({ fullName, email, password, phone }) => {
       `
       INSERT INTO users (fullName, email, password, phone)
       VALUES($1, $2, $3, $4)
-      RETURNING id, fullname, email, phone, isadmin, created_at
+      RETURNING id, fullname, email, phone, isadmin, status, created_at
       `,
       [fullName, email, hash, phone],
     );
@@ -165,7 +166,7 @@ module.exports.createAdmin = async ({ fullName, email, password, phone }) => {
       `
       INSERT INTO users (fullName, email, password, phone, isadmin)
       VALUES($1, $2, $3, $4, $5)
-      RETURNING id, fullname, email, phone, isadmin, created_at
+      RETURNING id, fullname, email, phone, isadmin, status, created_at
       `,
       [fullName, email, hash, phone, true],
     );
@@ -178,13 +179,41 @@ module.exports.createAdmin = async ({ fullName, email, password, phone }) => {
   }
 };
 
+module.exports.detail = async ({ id }, actor) => {
+  try {
+    if (!canManageUser(actor, id)) {
+      throw new AppError("Không có quyền", 403);
+    }
+
+    const result = await pool.query(
+      `
+      SELECT id, fullname, email, phone, isadmin, status, created_at
+      FROM users
+      WHERE id = $1
+      `,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError("Tài khoản không tồn tại", 404);
+    }
+
+    return {
+      result: result.rows[0],
+      message: "success",
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
 module.exports.update = async ({ id }, data, actor) => {
   try {
     if (!canManageUser(actor, id)) {
       throw new AppError("Không có quyền", 403);
     }
 
-    const { fullName, email, password, phone } = data;
+    const { fullName, email, password, phone, isadmin, status } = data;
 
     // Kiểm tra có user này không
     const checkUer = await pool.query(
@@ -232,11 +261,13 @@ module.exports.update = async ({ id }, data, actor) => {
         fullName = COALESCE($1, fullName),
         email = COALESCE($2, email),
         password = COALESCE($3, password),
-        phone = COALESCE($4, phone)
-      WHERE id=$5
-      RETURNING id, fullname, email, phone, isadmin, created_at
+        phone = COALESCE($4, phone),
+        isadmin = COALESCE($5, isadmin),
+        status = COALESCE($6, status)
+      WHERE id=$7
+      RETURNING id, fullname, email, phone, isadmin, status, created_at
       `,
-      [fullName, email, hashPw, phone, id],
+      [fullName, email, hashPw, phone, isadmin, status, id],
     );
     return {
       result: result.rows[0],
@@ -258,7 +289,7 @@ module.exports.delete = async ({ id }, actor) => {
       DELETE 
       FROM users
       WHERE id = $1
-      RETURNING id, fullname, email, phone, isadmin, created_at
+      RETURNING id, fullname, email, phone, isadmin, status, created_at
       `,
       [id],
     );
