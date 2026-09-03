@@ -102,6 +102,10 @@ function getSocketUser(socket) {
   }
 }
 
+function getSocketSenderRole(socket) {
+  return socket.data.user?.isAdmin === true ? "admin" : "user";
+}
+
 async function canSocketJoinConversation(socket, conversationId) {
   const user = socket.data.user;
 
@@ -160,6 +164,41 @@ io.on("connection", (socket) => {
     }
 
     socket.join(`conversation:${conversationId}`);
+  });
+
+  socket.on("chat:typing", async (conversationId) => {
+    if (!(await canSocketJoinConversation(socket, conversationId))) {
+      socket.emit("chat:error", { message: "Không có quyền" });
+      return;
+    }
+
+    const payload = {
+      conversationId: Number(conversationId),
+      senderRole: getSocketSenderRole(socket),
+    };
+
+    socket.to(`conversation:${conversationId}`).emit("chat:typing", payload);
+
+    if (payload.senderRole === "user") {
+      global.io.to("admin:messages").emit("chat:typing", payload);
+    }
+  });
+
+  socket.on("chat:stop-typing", async (conversationId) => {
+    if (!(await canSocketJoinConversation(socket, conversationId))) {
+      return;
+    }
+
+    const payload = {
+      conversationId: Number(conversationId),
+      senderRole: getSocketSenderRole(socket),
+    };
+
+    socket.to(`conversation:${conversationId}`).emit("chat:stop-typing", payload);
+
+    if (payload.senderRole === "user") {
+      global.io.to("admin:messages").emit("chat:stop-typing", payload);
+    }
   });
 
   socket.on("chat:leave-conversation", (conversationId) => {

@@ -125,6 +125,20 @@ test("chat socket auth supports a short-lived token from an authenticated REST r
   assert.match(index, /process\.env\.ACCESS_TOKEN/);
 });
 
+test("chat socket forwards typing state without persisting it", () => {
+  const index = read("index.js");
+  const service = read("services/conversations.service.js");
+
+  assert.match(index, /chat:typing/);
+  assert.match(index, /chat:stop-typing/);
+  assert.match(index, /getSocketSenderRole\(socket\)/);
+  assert.match(index, /canSocketJoinConversation\(socket,\s*conversationId\)/);
+  assert.match(index, /socket\.to\(`conversation:\$\{conversationId\}`\)\.emit\("chat:typing"/);
+  assert.match(index, /global\.io\.to\("admin:messages"\)\.emit\("chat:typing"/);
+  assert.doesNotMatch(service, /chat:typing/);
+  assert.doesNotMatch(service, /chat:stop-typing/);
+});
+
 test("human chat realtime updates include user and stadium metadata", () => {
   const service = read("services/conversations.service.js");
 
