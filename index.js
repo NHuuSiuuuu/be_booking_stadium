@@ -77,6 +77,16 @@ function parseSocketCookies(cookieHeader = "") {
 }
 
 function getSocketUser(socket) {
+  const authToken = socket.handshake.auth?.token;
+
+  if (authToken) {
+    try {
+      return jwt.verify(authToken, process.env.ACCESS_TOKEN);
+    } catch (err) {
+      return null;
+    }
+  }
+
   const cookies = parseSocketCookies(socket.handshake.headers.cookie || "");
   const token = cookies.access_token || cookies.refresh_token;
 

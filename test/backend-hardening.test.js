@@ -109,6 +109,22 @@ test("socket chat rooms require authenticated users with conversation access", (
   assert.match(index, /socket\.emit\("chat:error",\s*\{\s*message:\s*"Không có quyền"\s*\}\)/);
 });
 
+test("chat socket auth supports a short-lived token from an authenticated REST route", () => {
+  const route = read("routes/conversation.route.js");
+  const controller = read("controllers/conversations.controller.js");
+  const index = read("index.js");
+
+  assert.match(
+    route,
+    /router\.post\("\/socket-token",\s*authMiddleWare,\s*controller\.createSocketToken\)/,
+  );
+  assert.match(controller, /module\.exports\.createSocketToken/);
+  assert.match(controller, /jwt\.sign\(/);
+  assert.match(controller, /expiresIn:\s*"5m"/);
+  assert.match(index, /socket\.handshake\.auth\?\.token/);
+  assert.match(index, /process\.env\.ACCESS_TOKEN/);
+});
+
 test("human chat realtime updates include user and stadium metadata", () => {
   const service = read("services/conversations.service.js");
 
