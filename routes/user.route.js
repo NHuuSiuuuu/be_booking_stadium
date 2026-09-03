@@ -9,6 +9,8 @@ router.post("/create", controller.create);
 
 router.post("/create-admin", authMiddleWare, adminMiddleWare, controller.createAdmin);
 
+router.get("/detail/:id", authMiddleWare, controller.detail);
+
 router.patch("/update/:id", authMiddleWare, controller.update);
 
 router.delete("/delete/:id", authMiddleWare, controller.delete);

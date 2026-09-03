@@ -37,6 +37,18 @@ module.exports.createAdmin = async (req, res) => {
   }
 };
 
+module.exports.detail = async (req, res) => {
+  try {
+    const id = req.params;
+    const result = await UserService.detail(id, req.user);
+    return res.status(200).json(result);
+  } catch (e) {
+    return res.status(e.status || 500).json({
+      message: e.message || e,
+    });
+  }
+};
+
 module.exports.update = async (req, res) => {
   try {
     const id = req.params;

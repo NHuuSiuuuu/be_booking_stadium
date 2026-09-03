@@ -178,6 +178,34 @@ module.exports.createAdmin = async ({ fullName, email, password, phone }) => {
   }
 };
 
+module.exports.detail = async ({ id }, actor) => {
+  try {
+    if (!canManageUser(actor, id)) {
+      throw new AppError("Không có quyền", 403);
+    }
+
+    const result = await pool.query(
+      `
+      SELECT id, fullname, email, phone, isadmin, created_at
+      FROM users
+      WHERE id = $1
+      `,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError("Tài khoản không tồn tại", 404);
+    }
+
+    return {
+      result: result.rows[0],
+      message: "success",
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
 module.exports.update = async ({ id }, data, actor) => {
   try {
     if (!canManageUser(actor, id)) {
