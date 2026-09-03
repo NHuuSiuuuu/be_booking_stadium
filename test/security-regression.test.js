@@ -53,6 +53,49 @@ test("sensitive routes require authentication and admin authorization", () => {
   );
 });
 
+test("human chat schema documents conversations and messages tables", () => {
+  const schema = read("docs/database/user-admin-chat.sql");
+
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS conversations/);
+  assert.match(schema, /user_id INTEGER NOT NULL REFERENCES users\(id\)/);
+  assert.match(schema, /stadium_id INTEGER REFERENCES stadiums\(id\)/);
+  assert.match(schema, /status VARCHAR\(20\) NOT NULL DEFAULT 'open'/);
+  assert.match(schema, /admin_unread_count INTEGER NOT NULL DEFAULT 0/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS messages/);
+  assert.match(
+    schema,
+    /conversation_id INTEGER NOT NULL REFERENCES conversations\(id\) ON DELETE CASCADE/,
+  );
+  assert.match(schema, /sender_role VARCHAR\(20\) NOT NULL/);
+});
+
+test("human chat routes are mounted with auth and kept separate from AI chat", () => {
+  const routes = read("routes/conversation.route.js");
+  const index = read("routes/index.route.js");
+  const aiChat = read("routes/chat.route.js");
+
+  assert.match(index, /app\.use\("\/api\/conversations",\s*conversationRoutes\)/);
+  assert.match(routes, /router\.post\("\/",\s*authMiddleWare,\s*controller\.getOrCreate\)/);
+  assert.match(routes, /router\.get\("\/",\s*authMiddleWare,\s*controller\.list\)/);
+  assert.match(
+    routes,
+    /router\.get\("\/:id\/messages",\s*authMiddleWare,\s*controller\.getMessages\)/,
+  );
+  assert.match(
+    routes,
+    /router\.post\("\/:id\/messages",\s*authMiddleWare,\s*controller\.sendMessage\)/,
+  );
+  assert.match(
+    routes,
+    /router\.patch\("\/:id\/read",\s*authMiddleWare,\s*controller\.markRead\)/,
+  );
+  assert.match(
+    routes,
+    /router\.patch\("\/:id\/close",\s*authMiddleWare,\s*adminMiddleWare,\s*controller\.close\)/,
+  );
+  assert.match(aiChat, /route\.post\(`\/`,\s*ChatController\.chat\)/);
+});
+
 test("user detail endpoint returns one account through the user service", () => {
   const controller = read("controllers/user.controller.js");
   const service = read("services/user.service.js");

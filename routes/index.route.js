@@ -8,6 +8,7 @@ const statisticsRoute = require("./statistics.route");
 
 const reviewsRoute = require("./reviews.route");
 const chatRoute = require("./chat.route");
+const conversationRoutes = require("./conversation.route");
 const { adminMiddleWare } = require("../middleware/admin.middleware");
 
 module.exports = (app) => {
@@ -28,6 +29,8 @@ module.exports = (app) => {
   app.use("/api/reviews", reviewsRoute);
 
   app.use("/api/chat", chatRoute);
+
+  app.use("/api/conversations", conversationRoutes);
 
   
 };
