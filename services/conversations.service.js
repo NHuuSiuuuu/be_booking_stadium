@@ -48,6 +48,7 @@ async function getConversationDetail(conversationId) {
       c.last_message_at,
       c.user_unread_count,
       c.admin_unread_count,
+      c.admin_hidden_at,
       c.created_at,
       c.updated_at,
       u.fullname AS user_fullname,
@@ -124,6 +125,7 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
       c.last_message_at,
       c.user_unread_count,
       c.admin_unread_count,
+      c.admin_hidden_at,
       c.created_at,
       c.updated_at,
       s.name AS stadium_name,
@@ -156,6 +158,7 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
         last_message_at,
         user_unread_count,
         admin_unread_count,
+        admin_hidden_at,
         created_at,
         updated_at
       `,
@@ -178,6 +181,7 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
       last_message_at,
       user_unread_count,
       admin_unread_count,
+      admin_hidden_at,
       created_at,
       updated_at
     `,
@@ -189,12 +193,17 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
 
 module.exports.list = async (actor) => {
   const values = [];
-  let whereSql = "";
+  const whereConditions = [];
 
   if (actor.isAdmin !== true) {
     values.push(actor.id);
-    whereSql = "WHERE c.user_id = $1";
+    whereConditions.push("c.user_id = $1");
+  } else {
+    whereConditions.push("c.admin_hidden_at IS NULL");
   }
+
+  const whereSql =
+    whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
   const result = await pool.query(
     `
@@ -207,6 +216,7 @@ module.exports.list = async (actor) => {
       c.last_message_at,
       c.user_unread_count,
       c.admin_unread_count,
+      c.admin_hidden_at,
       c.created_at,
       c.updated_at,
       u.fullname AS user_fullname,
@@ -285,7 +295,8 @@ module.exports.sendMessage = async (conversationId, actor, content) => {
       last_message_at = NOW(),
       updated_at = NOW(),
       admin_unread_count = CASE WHEN $2 = 'user' THEN admin_unread_count + 1 ELSE admin_unread_count END,
-      user_unread_count = CASE WHEN $2 = 'admin' THEN user_unread_count + 1 ELSE user_unread_count END
+      user_unread_count = CASE WHEN $2 = 'admin' THEN user_unread_count + 1 ELSE user_unread_count END,
+      admin_hidden_at = CASE WHEN $2 = 'user' THEN NULL ELSE admin_hidden_at END
     WHERE id = $3
     `,
     [safeContent, senderRole, conversationId],
@@ -372,7 +383,8 @@ module.exports.close = async (conversationId) => {
 module.exports.delete = async (conversationId) => {
   const result = await pool.query(
     `
-    DELETE FROM conversations
+    UPDATE conversations
+    SET admin_hidden_at = NOW(), updated_at = NOW()
     WHERE id = $1
     RETURNING id
     `,

@@ -242,6 +242,27 @@ test("human chat reuses one conversation per user and updates stadium context", 
   }
 });
 
+test("admin conversation delete hides the thread without deleting user history", () => {
+  const service = read("services/conversations.service.js");
+  const schema = read("docs/database/user-admin-chat.sql");
+
+  assert.match(schema, /admin_hidden_at TIMESTAMP/);
+  assert.match(
+    schema,
+    /ALTER TABLE conversations\s+ADD COLUMN IF NOT EXISTS admin_hidden_at TIMESTAMP/,
+  );
+  assert.match(service, /c\.admin_hidden_at IS NULL/);
+  assert.match(
+    service,
+    /admin_hidden_at = CASE WHEN \$2 = 'user' THEN NULL ELSE admin_hidden_at END/,
+  );
+  assert.match(service, /UPDATE conversations\s+SET admin_hidden_at = NOW\(\)/);
+  assert.doesNotMatch(
+    service,
+    /DELETE FROM conversations\s+WHERE id = \$1\s+RETURNING id/,
+  );
+});
+
 test("holdSlots succeeds with no previous hold and schedules cleanup for the created hold", async () => {
   const queries = [];
   const client = {

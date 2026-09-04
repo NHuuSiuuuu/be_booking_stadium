@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   last_message_at TIMESTAMP,
   user_unread_count INTEGER NOT NULL DEFAULT 0,
   admin_unread_count INTEGER NOT NULL DEFAULT 0,
+  admin_hidden_at TIMESTAMP,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   CONSTRAINT conversations_status_check CHECK (status IN ('open', 'closed')),
@@ -29,6 +30,9 @@ CREATE INDEX IF NOT EXISTS conversations_user_id_idx ON conversations(user_id);
 CREATE INDEX IF NOT EXISTS conversations_stadium_id_idx ON conversations(stadium_id);
 CREATE INDEX IF NOT EXISTS conversations_last_message_at_idx ON conversations(last_message_at DESC);
 CREATE INDEX IF NOT EXISTS messages_conversation_id_created_at_idx ON messages(conversation_id, created_at ASC);
+
+ALTER TABLE conversations
+ADD COLUMN IF NOT EXISTS admin_hidden_at TIMESTAMP;
 
 -- Migration for existing deployments that previously allowed one conversation per user/stadium.
 -- Keeps the newest conversation per user, moves older messages into it, then replaces the unique constraint.
