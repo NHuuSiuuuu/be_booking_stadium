@@ -1,4 +1,22 @@
+const jwt = require("jsonwebtoken");
 const ConversationService = require("../services/conversations.service");
+
+module.exports.createSocketToken = async (req, res, next) => {
+  try {
+    const token = jwt.sign(
+      {
+        id: req.user.id,
+        isAdmin: req.user.isAdmin === true,
+      },
+      process.env.ACCESS_TOKEN,
+      { expiresIn: "5m" },
+    );
+
+    res.json({ message: "success", result: { token } });
+  } catch (err) {
+    next(err);
+  }
+};
 
 module.exports.getOrCreate = async (req, res, next) => {
   try {

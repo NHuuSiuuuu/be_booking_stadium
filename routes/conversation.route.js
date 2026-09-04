@@ -4,6 +4,7 @@ const controller = require("../controllers/conversations.controller");
 const { authMiddleWare } = require("../middleware/auth.middleware");
 const { adminMiddleWare } = require("../middleware/admin.middleware");
 
+router.post("/socket-token", authMiddleWare, controller.createSocketToken);
 router.post("/", authMiddleWare, controller.getOrCreate);
 router.get("/", authMiddleWare, controller.list);
 router.get("/:id/messages", authMiddleWare, controller.getMessages);

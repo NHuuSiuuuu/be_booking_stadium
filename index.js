@@ -77,6 +77,16 @@ function parseSocketCookies(cookieHeader = "") {
 }
 
 function getSocketUser(socket) {
+  const authToken = socket.handshake.auth?.token;
+
+  if (authToken) {
+    try {
+      return jwt.verify(authToken, process.env.ACCESS_TOKEN);
+    } catch (err) {
+      return null;
+    }
+  }
+
   const cookies = parseSocketCookies(socket.handshake.headers.cookie || "");
   const token = cookies.access_token || cookies.refresh_token;
 
@@ -90,6 +100,10 @@ function getSocketUser(socket) {
   } catch (err) {
     return null;
   }
+}
+
+function getSocketSenderRole(socket) {
+  return socket.data.user?.isAdmin === true ? "admin" : "user";
 }
 
 async function canSocketJoinConversation(socket, conversationId) {
@@ -150,6 +164,41 @@ io.on("connection", (socket) => {
     }
 
     socket.join(`conversation:${conversationId}`);
+  });
+
+  socket.on("chat:typing", async (conversationId) => {
+    if (!(await canSocketJoinConversation(socket, conversationId))) {
+      socket.emit("chat:error", { message: "Không có quyền" });
+      return;
+    }
+
+    const payload = {
+      conversationId: Number(conversationId),
+      senderRole: getSocketSenderRole(socket),
+    };
+
+    socket.to(`conversation:${conversationId}`).emit("chat:typing", payload);
+
+    if (payload.senderRole === "user") {
+      global.io.to("admin:messages").emit("chat:typing", payload);
+    }
+  });
+
+  socket.on("chat:stop-typing", async (conversationId) => {
+    if (!(await canSocketJoinConversation(socket, conversationId))) {
+      return;
+    }
+
+    const payload = {
+      conversationId: Number(conversationId),
+      senderRole: getSocketSenderRole(socket),
+    };
+
+    socket.to(`conversation:${conversationId}`).emit("chat:stop-typing", payload);
+
+    if (payload.senderRole === "user") {
+      global.io.to("admin:messages").emit("chat:stop-typing", payload);
+    }
   });
 
   socket.on("chat:leave-conversation", (conversationId) => {
