@@ -98,21 +98,19 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
     throw new AppError("Hết phiên đăng nhập", 401);
   }
 
-  if (!stadiumId) {
-    throw new AppError("Thiếu sân cần liên hệ", 400);
-  }
+  if (stadiumId) {
+    const stadium = await pool.query(
+      `
+      SELECT id
+      FROM stadiums
+      WHERE id = $1
+      `,
+      [stadiumId],
+    );
 
-  const stadium = await pool.query(
-    `
-    SELECT id
-    FROM stadiums
-    WHERE id = $1
-    `,
-    [stadiumId],
-  );
-
-  if (stadium.rows.length === 0) {
-    throw new AppError("Sân không tồn tại", 404);
+    if (stadium.rows.length === 0) {
+      throw new AppError("Sân không tồn tại", 404);
+    }
   }
 
   const existing = await pool.query(
@@ -132,13 +130,39 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
       s.slug AS stadium_slug
     FROM conversations c
     LEFT JOIN stadiums s ON s.id = c.stadium_id
-    WHERE c.user_id = $1 AND c.stadium_id = $2
+    WHERE c.user_id = $1
+    ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
+    LIMIT 1
     `,
-    [userId, stadiumId],
+    [userId],
   );
 
   if (existing.rows[0]) {
-    return existing.rows[0];
+    if (!stadiumId || String(existing.rows[0].stadium_id) === String(stadiumId)) {
+      return existing.rows[0];
+    }
+
+    const updated = await pool.query(
+      `
+      UPDATE conversations
+      SET stadium_id = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING
+        id,
+        user_id,
+        stadium_id,
+        status,
+        last_message,
+        last_message_at,
+        user_unread_count,
+        admin_unread_count,
+        created_at,
+        updated_at
+      `,
+      [stadiumId, existing.rows[0].id],
+    );
+
+    return getConversationDetail(updated.rows[0].id);
   }
 
   const created = await pool.query(
@@ -343,4 +367,27 @@ module.exports.close = async (conversationId) => {
   emitConversationUpdated(updatedConversation);
 
   return updatedConversation;
+};
+
+module.exports.delete = async (conversationId) => {
+  const result = await pool.query(
+    `
+    DELETE FROM conversations
+    WHERE id = $1
+    RETURNING id
+    `,
+    [conversationId],
+  );
+
+  if (result.rows.length === 0) {
+    throw new AppError("Cuộc trò chuyện không tồn tại", 404);
+  }
+
+  if (global.io) {
+    global.io.to("admin:messages").emit("chat:conversation-deleted", {
+      conversationId: Number(conversationId),
+    });
+  }
+
+  return { id: Number(conversationId) };
 };

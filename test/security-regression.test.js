@@ -61,6 +61,8 @@ test("human chat schema documents conversations and messages tables", () => {
   assert.match(schema, /stadium_id INTEGER REFERENCES stadiums\(id\)/);
   assert.match(schema, /status VARCHAR\(20\) NOT NULL DEFAULT 'open'/);
   assert.match(schema, /admin_unread_count INTEGER NOT NULL DEFAULT 0/);
+  assert.match(schema, /CONSTRAINT conversations_user_unique UNIQUE \(user_id\)/);
+  assert.doesNotMatch(schema, /CONSTRAINT conversations_user_stadium_unique UNIQUE \(user_id, stadium_id\)/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS messages/);
   assert.match(
     schema,
@@ -92,6 +94,10 @@ test("human chat routes are mounted with auth and kept separate from AI chat", (
   assert.match(
     routes,
     /router\.patch\("\/:id\/close",\s*authMiddleWare,\s*adminMiddleWare,\s*controller\.close\)/,
+  );
+  assert.match(
+    routes,
+    /router\.delete\("\/:id",\s*authMiddleWare,\s*adminMiddleWare,\s*controller\.delete\)/,
   );
   assert.match(aiChat, /route\.post\(`\/`,\s*ChatController\.chat\)/);
 });

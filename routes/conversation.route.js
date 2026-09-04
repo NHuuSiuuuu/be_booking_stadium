@@ -11,5 +11,6 @@ router.get("/:id/messages", authMiddleWare, controller.getMessages);
 router.post("/:id/messages", authMiddleWare, controller.sendMessage);
 router.patch("/:id/read", authMiddleWare, controller.markRead);
 router.patch("/:id/close", authMiddleWare, adminMiddleWare, controller.close);
+router.delete("/:id", authMiddleWare, adminMiddleWare, controller.delete);
 
 module.exports = router;
