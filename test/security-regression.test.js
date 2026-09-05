@@ -151,6 +151,14 @@ test("booking creation does not wait for email delivery before responding", () =
   assert.match(bookingService, /transporter\s*\.\s*sendMail\([\s\S]*\.catch\(/);
 });
 
+test("district list omits geometry payload used only for map boundaries", () => {
+  const districtService = read("services/districts.service.js");
+
+  assert.match(districtService, /SELECT ogc_fid,\s*name_2/);
+  assert.doesNotMatch(districtService, /ST_AsGeoJSON/);
+  assert.doesNotMatch(districtService, /wkb_geometry/);
+});
+
 test("cors allows normalized frontend origins and Vercel preview deployments", () => {
   const index = read("index.js");
 
