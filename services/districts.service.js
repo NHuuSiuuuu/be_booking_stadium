@@ -3,8 +3,7 @@ const { pool } = require("../pool");
 module.exports.index = async () => {
   try {
     const result = await pool.query(`
-        SELECT ogc_fid,name_2,
-        ST_AsGeoJSON(wkb_geometry) as geom
+        SELECT ogc_fid, name_2
         FROM hanoi_districts
       `);
     return {
