@@ -48,6 +48,16 @@ test("vnpay return route verifies signed return data before updating booking pay
   assert.match(service, /status = 'pending'/);
 });
 
+test("cancelled vnpay returns mark online bookings as failed payments", () => {
+  const service = read("services/bookings.service.js");
+
+  assert.match(service, /verification\.isSuccess/);
+  assert.match(service, /SET status = 'cancelled',\s*payment_status = 'failed'/);
+  assert.match(service, /AND payment_method = 'online'/);
+  assert.match(service, /AND payment_status = 'unpaid'/);
+  assert.match(service, /AND status = 'pending'/);
+});
+
 test("online booking validates vnpay configuration before committing booking", () => {
   const service = read("services/bookings.service.js");
 

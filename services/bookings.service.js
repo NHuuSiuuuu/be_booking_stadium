@@ -761,7 +761,8 @@ module.exports.checkPaymentVNPay = async (query) => {
     updateResult = await pool.query(
       `
       UPDATE bookings
-      SET status = 'cancelled'
+      SET status = 'cancelled',
+          payment_status = 'failed'
       WHERE id = $1
       AND payment_method = 'online'
       AND payment_status = 'unpaid'
