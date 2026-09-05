@@ -380,3 +380,61 @@ test("admin statistics include operational summaries and csv export data", () =>
   assert.match(service, /GROUP BY payment_method,\s*payment_status/);
   assert.match(service, /function\s+escapeCsvValue/);
 });
+
+test("cancelled paid online bookings are marked as waiting for refund", async () => {
+  const queries = [];
+  const pool = {
+    query: async (sql, values) => {
+      queries.push({ sql, values });
+
+      if (/SELECT \* FROM bookings WHERE id = \$1/.test(sql)) {
+        return {
+          rows: [
+            {
+              id: 44,
+              user_id: 7,
+              status: "confirmed",
+              payment_method: "online",
+              payment_status: "paid",
+            },
+          ],
+        };
+      }
+
+      return { rows: [], rowCount: 1 };
+    },
+  };
+
+  const poolPath = require.resolve("../pool");
+  const servicePath = require.resolve("../services/bookings.service");
+  const previousPool = require.cache[poolPath];
+  delete require.cache[servicePath];
+  require.cache[poolPath] = {
+    id: poolPath,
+    filename: poolPath,
+    loaded: true,
+    exports: { pool },
+  };
+
+  try {
+    const BookingService = require("../services/bookings.service");
+    await BookingService.cancelBooking(44, 7);
+
+    assert.equal(
+      queries.some(
+        (query) =>
+          /SET status = 'cancelled'/.test(query.sql) &&
+          query.values?.[0] === "refund_pending" &&
+          query.values?.[1] === 44,
+      ),
+      true,
+    );
+  } finally {
+    delete require.cache[servicePath];
+    if (previousPool) {
+      require.cache[poolPath] = previousPool;
+    } else {
+      delete require.cache[poolPath];
+    }
+  }
+});

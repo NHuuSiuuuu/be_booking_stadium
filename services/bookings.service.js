@@ -684,8 +684,8 @@ module.exports.cancelBooking = async (id, userId) => {
 
   // Xử lý hủy sân khi thanh toán = online
   let paymentStatus = booking.payment_status;
-  if (booking.payment_status === "paid") {
-    paymentStatus = "refunded";
+  if (booking.payment_method === "online" && booking.payment_status === "paid") {
+    paymentStatus = "refund_pending";
   }
   await pool.query(
     `
