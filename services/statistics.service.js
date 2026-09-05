@@ -1,6 +1,40 @@
 const { pool } = require("../pool");
 const AppError = require("../utils/AppError");
 
+function escapeCsvValue(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  const text = String(value);
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
+}
+
+function toCsv(rows) {
+  const headers = [
+    "id",
+    "stadium_name",
+    "booking_date",
+    "start_time",
+    "end_time",
+    "customer_name",
+    "phone",
+    "payment_method",
+    "payment_status",
+    "status",
+    "total_price",
+  ];
+
+  return [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(",")),
+  ].join("\n");
+}
+
 // Tổng lượt đặt sân tháng này
 // Tổng doanh thu tháng này
 // Doanh thu trung bình tháng này
@@ -132,6 +166,87 @@ module.exports.topStadiums = async () => {
       message: "Top sân đặt nhiều nhất",
       status: "success",
     };
+  } catch (e) {
+    throw e;
+  }
+};
+
+module.exports.revenueByMonth = module.exports.bookingByMonth;
+
+module.exports.statusSummary = async () => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          status,
+          COUNT(*) AS total_bookings,
+          COALESCE(SUM(total_price), 0) AS total_revenue
+        FROM bookings
+        GROUP BY status
+        ORDER BY total_bookings DESC
+        `,
+    );
+
+    return {
+      data: result.rows,
+      message: "Thống kê đơn đặt theo trạng thái",
+      status: "success",
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
+module.exports.paymentSummary = async () => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          payment_method,
+          payment_status,
+          COUNT(*) AS total_bookings,
+          COALESCE(SUM(total_price), 0) AS total_revenue
+        FROM bookings
+        GROUP BY payment_method, payment_status
+        ORDER BY total_bookings DESC
+        `,
+    );
+
+    return {
+      data: result.rows,
+      message: "Thống kê đơn đặt theo phương thức thanh toán",
+      status: "success",
+    };
+  } catch (e) {
+    throw e;
+  }
+};
+
+module.exports.bookingsExportCsv = async () => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          b.id,
+          s.name AS stadium_name,
+          TO_CHAR(b.booking_date AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYY-MM-DD') AS booking_date,
+          pc.start_time,
+          pc.end_time,
+          b.full_name AS customer_name,
+          b.phone,
+          b.payment_method,
+          b.payment_status,
+          b.status,
+          b.total_price
+        FROM bookings b
+        JOIN stadiums s ON s.id = b.stadium_id
+        JOIN price_configs pc ON pc.id = b.price_config_id
+        ORDER BY b.booking_date DESC, b.id DESC
+        LIMIT 1000
+        `,
+    );
+
+    return toCsv(result.rows);
   } catch (e) {
     throw e;
   }

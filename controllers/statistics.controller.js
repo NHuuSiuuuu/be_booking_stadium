@@ -55,3 +55,41 @@ module.exports.topStadiums = async (req, res) => {
     });
   }
 };
+
+module.exports.statusSummary = async (req, res) => {
+  try {
+    const result = await StatisticService.statusSummary();
+    return res.status(200).json(result);
+  } catch (e) {
+    return res.status(e.status || 500).json({
+      message: e.message || e,
+    });
+  }
+};
+
+module.exports.paymentSummary = async (req, res) => {
+  try {
+    const result = await StatisticService.paymentSummary();
+    return res.status(200).json(result);
+  } catch (e) {
+    return res.status(e.status || 500).json({
+      message: e.message || e,
+    });
+  }
+};
+
+module.exports.bookingsExportCsv = async (req, res) => {
+  try {
+    const csv = await StatisticService.bookingsExportCsv();
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="booking-statistics.csv"',
+    );
+    return res.status(200).send(csv);
+  } catch (e) {
+    return res.status(e.status || 500).json({
+      message: e.message || e,
+    });
+  }
+};

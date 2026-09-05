@@ -51,6 +51,25 @@ test("sensitive routes require authentication and admin authorization", () => {
     chatRoutes,
     /route\.post\(`\/update-docs-stadium\/:stadiumId`,\s*authMiddleWare,\s*adminMiddleWare,\s*ChatController\.updateDocument\s*\)/s,
   );
+
+  const statisticsRoutes = read("routes/statistics.route.js");
+  for (const routePath of [
+    "overview",
+    "revenue-by-month",
+    "bookings-by-month",
+    "top-stadiums",
+    "status-summary",
+    "payment-summary",
+    "bookings-export.csv",
+  ]) {
+    assert.match(
+      statisticsRoutes,
+      new RegExp(
+        `route\\.get\\(\\s*\`/${routePath}\`,\\s*authMiddleWare,\\s*adminMiddleWare,`,
+        "s",
+      ),
+    );
+  }
 });
 
 test("human chat schema documents conversations and messages tables", () => {

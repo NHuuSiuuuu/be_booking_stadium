@@ -362,3 +362,21 @@ test("holdSlots succeeds with no previous hold and schedules cleanup for the cre
     }
   }
 });
+
+test("admin statistics include operational summaries and csv export data", () => {
+  const controller = read("controllers/statistics.controller.js");
+  const service = read("services/statistics.service.js");
+
+  assert.match(controller, /module\.exports\.statusSummary/);
+  assert.match(controller, /module\.exports\.paymentSummary/);
+  assert.match(controller, /module\.exports\.bookingsExportCsv/);
+  assert.match(controller, /res\.setHeader\("Content-Type",\s*"text\/csv; charset=utf-8"\)/);
+  assert.match(controller, /attachment; filename="booking-statistics\.csv"/);
+
+  assert.match(service, /module\.exports\.statusSummary/);
+  assert.match(service, /module\.exports\.paymentSummary/);
+  assert.match(service, /module\.exports\.bookingsExportCsv/);
+  assert.match(service, /GROUP BY status/);
+  assert.match(service, /GROUP BY payment_method,\s*payment_status/);
+  assert.match(service, /function\s+escapeCsvValue/);
+});
