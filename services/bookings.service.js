@@ -8,16 +8,11 @@ const {
   VnpLocale,
   dateFormat,
 } = require("vnpay");
-const nodemailer = require("nodemailer");
-
-// Gửi email OTp
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
+const {
+  createMailTransporter,
+  getMailTransportOptions,
+  isMailConfigured,
+} = require("./mail.service");
 
 function getFrontendUrl() {
   return (
@@ -47,7 +42,7 @@ function createVNPayClient() {
 }
 
 function sendBookingConfirmationEmail(booking) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+  if (!isMailConfigured()) {
     console.log("Mail bỏ qua: Thiếu cấu hình EMAIL_USER hoặc EMAIL_PASSWORD");
     return;
   }
@@ -58,6 +53,8 @@ function sendBookingConfirmationEmail(booking) {
     booking.payment_method === "online"
       ? "Thanh toán online"
       : "Thanh toán tại sân";
+  const transportOptions = getMailTransportOptions();
+  const transporter = createMailTransporter();
 
   transporter
     .sendMail({
@@ -106,7 +103,10 @@ function sendBookingConfirmationEmail(booking) {
         `,
     })
     .catch((err) => {
-      console.log("Mail lỗi:", err.message);
+      console.log(
+        `Mail lỗi (${transportOptions.host}:${transportOptions.port}):`,
+        err.code || err.message,
+      );
     });
 }
 

@@ -159,6 +159,12 @@ test("runtime config is read from environment instead of duplicated or hard-code
   assert.match(bookingService, /process\.env\.VNPAY_SECURE_SECRET/);
 });
 
+test("production start command runs node without debugger or nodemon", () => {
+  const pkg = JSON.parse(read("package.json"));
+
+  assert.equal(pkg.scripts.start, "node index.js");
+});
+
 test("booking creation does not wait for email delivery before responding", () => {
   const bookingService = read("services/bookings.service.js");
 
