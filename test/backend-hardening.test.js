@@ -58,6 +58,14 @@ test("cancelled vnpay returns mark online bookings as failed payments", () => {
   assert.match(service, /AND status = 'pending'/);
 });
 
+test("reviews can only be created for completed bookings owned by the user", () => {
+  const service = read("services/reviews.service.js");
+
+  assert.match(service, /booking\.user_id !== userId/);
+  assert.match(service, /booking\.status !== "completed"/);
+  assert.match(service, /Chỉ được đánh giá sau khi hoàn thành/);
+});
+
 test("online booking validates vnpay configuration before committing booking", () => {
   const service = read("services/bookings.service.js");
 
