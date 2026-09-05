@@ -78,3 +78,12 @@ module.exports.close = async (req, res, next) => {
     next(err);
   }
 };
+
+module.exports.delete = async (req, res, next) => {
+  try {
+    const result = await ConversationService.delete(req.params.id);
+    res.json({ message: "success", result });
+  } catch (err) {
+    next(err);
+  }
+};

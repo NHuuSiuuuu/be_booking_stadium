@@ -48,6 +48,7 @@ async function getConversationDetail(conversationId) {
       c.last_message_at,
       c.user_unread_count,
       c.admin_unread_count,
+      c.admin_hidden_at,
       c.created_at,
       c.updated_at,
       u.fullname AS user_fullname,
@@ -98,21 +99,19 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
     throw new AppError("Hết phiên đăng nhập", 401);
   }
 
-  if (!stadiumId) {
-    throw new AppError("Thiếu sân cần liên hệ", 400);
-  }
+  if (stadiumId) {
+    const stadium = await pool.query(
+      `
+      SELECT id
+      FROM stadiums
+      WHERE id = $1
+      `,
+      [stadiumId],
+    );
 
-  const stadium = await pool.query(
-    `
-    SELECT id
-    FROM stadiums
-    WHERE id = $1
-    `,
-    [stadiumId],
-  );
-
-  if (stadium.rows.length === 0) {
-    throw new AppError("Sân không tồn tại", 404);
+    if (stadium.rows.length === 0) {
+      throw new AppError("Sân không tồn tại", 404);
+    }
   }
 
   const existing = await pool.query(
@@ -126,19 +125,47 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
       c.last_message_at,
       c.user_unread_count,
       c.admin_unread_count,
+      c.admin_hidden_at,
       c.created_at,
       c.updated_at,
       s.name AS stadium_name,
       s.slug AS stadium_slug
     FROM conversations c
     LEFT JOIN stadiums s ON s.id = c.stadium_id
-    WHERE c.user_id = $1 AND c.stadium_id = $2
+    WHERE c.user_id = $1
+    ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
+    LIMIT 1
     `,
-    [userId, stadiumId],
+    [userId],
   );
 
   if (existing.rows[0]) {
-    return existing.rows[0];
+    if (!stadiumId || String(existing.rows[0].stadium_id) === String(stadiumId)) {
+      return existing.rows[0];
+    }
+
+    const updated = await pool.query(
+      `
+      UPDATE conversations
+      SET stadium_id = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING
+        id,
+        user_id,
+        stadium_id,
+        status,
+        last_message,
+        last_message_at,
+        user_unread_count,
+        admin_unread_count,
+        admin_hidden_at,
+        created_at,
+        updated_at
+      `,
+      [stadiumId, existing.rows[0].id],
+    );
+
+    return getConversationDetail(updated.rows[0].id);
   }
 
   const created = await pool.query(
@@ -154,6 +181,7 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
       last_message_at,
       user_unread_count,
       admin_unread_count,
+      admin_hidden_at,
       created_at,
       updated_at
     `,
@@ -165,12 +193,17 @@ module.exports.getOrCreate = async ({ userId, stadiumId }) => {
 
 module.exports.list = async (actor) => {
   const values = [];
-  let whereSql = "";
+  const whereConditions = [];
 
   if (actor.isAdmin !== true) {
     values.push(actor.id);
-    whereSql = "WHERE c.user_id = $1";
+    whereConditions.push("c.user_id = $1");
+  } else {
+    whereConditions.push("c.admin_hidden_at IS NULL");
   }
+
+  const whereSql =
+    whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "";
 
   const result = await pool.query(
     `
@@ -183,6 +216,7 @@ module.exports.list = async (actor) => {
       c.last_message_at,
       c.user_unread_count,
       c.admin_unread_count,
+      c.admin_hidden_at,
       c.created_at,
       c.updated_at,
       u.fullname AS user_fullname,
@@ -261,7 +295,8 @@ module.exports.sendMessage = async (conversationId, actor, content) => {
       last_message_at = NOW(),
       updated_at = NOW(),
       admin_unread_count = CASE WHEN $2 = 'user' THEN admin_unread_count + 1 ELSE admin_unread_count END,
-      user_unread_count = CASE WHEN $2 = 'admin' THEN user_unread_count + 1 ELSE user_unread_count END
+      user_unread_count = CASE WHEN $2 = 'admin' THEN user_unread_count + 1 ELSE user_unread_count END,
+      admin_hidden_at = CASE WHEN $2 = 'user' THEN NULL ELSE admin_hidden_at END
     WHERE id = $3
     `,
     [safeContent, senderRole, conversationId],
@@ -343,4 +378,28 @@ module.exports.close = async (conversationId) => {
   emitConversationUpdated(updatedConversation);
 
   return updatedConversation;
+};
+
+module.exports.delete = async (conversationId) => {
+  const result = await pool.query(
+    `
+    UPDATE conversations
+    SET admin_hidden_at = NOW(), updated_at = NOW()
+    WHERE id = $1
+    RETURNING id
+    `,
+    [conversationId],
+  );
+
+  if (result.rows.length === 0) {
+    throw new AppError("Cuộc trò chuyện không tồn tại", 404);
+  }
+
+  if (global.io) {
+    global.io.to("admin:messages").emit("chat:conversation-deleted", {
+      conversationId: Number(conversationId),
+    });
+  }
+
+  return { id: Number(conversationId) };
 };

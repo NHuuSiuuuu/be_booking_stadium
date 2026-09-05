@@ -149,6 +149,120 @@ test("human chat realtime updates include user and stadium metadata", () => {
   assert.match(service, /emitMessageCreated\(conversationId,\s*message,\s*updatedConversation\)/);
 });
 
+test("human chat reuses one conversation per user and updates stadium context", async () => {
+  const queries = [];
+  const existingConversation = {
+    id: 9,
+    user_id: 7,
+    stadium_id: 1,
+    status: "open",
+    last_message: "old",
+    last_message_at: null,
+    user_unread_count: 0,
+    admin_unread_count: 0,
+    created_at: "2026-09-04T00:00:00Z",
+    updated_at: "2026-09-04T00:00:00Z",
+    stadium_name: "Sân cũ",
+    stadium_slug: "san-cu",
+  };
+  const updatedConversation = {
+    ...existingConversation,
+    stadium_id: 2,
+    stadium_name: "Sân mới",
+    stadium_slug: "san-moi",
+  };
+  const pool = {
+    query: async (sql, values) => {
+      queries.push({ sql, values });
+
+      if (/FROM stadiums\s+WHERE id = \$1/.test(sql)) {
+        return { rows: [{ id: values[0] }] };
+      }
+
+      if (/FROM conversations c/.test(sql) && /WHERE c.user_id = \$1/.test(sql)) {
+        return { rows: [existingConversation] };
+      }
+
+      if (/UPDATE conversations\s+SET stadium_id = \$1/.test(sql)) {
+        return { rows: [updatedConversation] };
+      }
+
+      if (/FROM conversations c/.test(sql) && /WHERE c.id = \$1/.test(sql)) {
+        return { rows: [updatedConversation] };
+      }
+
+      return { rows: [] };
+    },
+  };
+
+  const poolPath = require.resolve("../pool");
+  const servicePath = require.resolve("../services/conversations.service");
+  const previousPool = require.cache[poolPath];
+  delete require.cache[servicePath];
+  require.cache[poolPath] = {
+    id: poolPath,
+    filename: poolPath,
+    loaded: true,
+    exports: { pool },
+  };
+
+  try {
+    const ConversationService = require("../services/conversations.service");
+    const result = await ConversationService.getOrCreate({
+      userId: 7,
+      stadiumId: 2,
+    });
+
+    assert.equal(result.id, 9);
+    assert.equal(result.stadium_id, 2);
+    assert.equal(
+      queries.some((query) => /INSERT INTO conversations/.test(query.sql)),
+      false,
+    );
+    assert.equal(
+      queries.some((query) => /WHERE c.user_id = \$1 AND c.stadium_id = \$2/.test(query.sql)),
+      false,
+    );
+    assert.equal(
+      queries.some(
+        (query) =>
+          /UPDATE conversations\s+SET stadium_id = \$1/.test(query.sql) &&
+          query.values?.[0] === 2 &&
+          query.values?.[1] === 9,
+      ),
+      true,
+    );
+  } finally {
+    delete require.cache[servicePath];
+    if (previousPool) {
+      require.cache[poolPath] = previousPool;
+    } else {
+      delete require.cache[poolPath];
+    }
+  }
+});
+
+test("admin conversation delete hides the thread without deleting user history", () => {
+  const service = read("services/conversations.service.js");
+  const schema = read("docs/database/user-admin-chat.sql");
+
+  assert.match(schema, /admin_hidden_at TIMESTAMP/);
+  assert.match(
+    schema,
+    /ALTER TABLE conversations\s+ADD COLUMN IF NOT EXISTS admin_hidden_at TIMESTAMP/,
+  );
+  assert.match(service, /c\.admin_hidden_at IS NULL/);
+  assert.match(
+    service,
+    /admin_hidden_at = CASE WHEN \$2 = 'user' THEN NULL ELSE admin_hidden_at END/,
+  );
+  assert.match(service, /UPDATE conversations\s+SET admin_hidden_at = NOW\(\)/);
+  assert.doesNotMatch(
+    service,
+    /DELETE FROM conversations\s+WHERE id = \$1\s+RETURNING id/,
+  );
+});
+
 test("holdSlots succeeds with no previous hold and schedules cleanup for the created hold", async () => {
   const queries = [];
   const client = {
