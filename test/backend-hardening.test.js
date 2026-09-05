@@ -48,6 +48,16 @@ test("vnpay return route verifies signed return data before updating booking pay
   assert.match(service, /status = 'pending'/);
 });
 
+test("cancelled vnpay returns mark online bookings as failed payments", () => {
+  const service = read("services/bookings.service.js");
+
+  assert.match(service, /verification\.isSuccess/);
+  assert.match(service, /SET status = 'cancelled',\s*payment_status = 'failed'/);
+  assert.match(service, /AND payment_method = 'online'/);
+  assert.match(service, /AND payment_status = 'unpaid'/);
+  assert.match(service, /AND status = 'pending'/);
+});
+
 test("online booking validates vnpay configuration before committing booking", () => {
   const service = read("services/bookings.service.js");
 
@@ -59,6 +69,27 @@ test("online booking validates vnpay configuration before committing booking", (
   assert.notEqual(configCheckIndex, -1);
   assert.ok(configCheckIndex < beginIndex);
   assert.ok(commitIndex < buildPaymentIndex);
+});
+
+test("online booking confirmation email is sent only after vnpay succeeds", () => {
+  const service = read("services/bookings.service.js");
+  const createSource = service.slice(
+    service.indexOf("module.exports.create"),
+    service.indexOf("// Danh sách booking"),
+  );
+
+  assert.match(service, /function\s+sendBookingConfirmationEmail/);
+  assert.match(createSource, /if \(result\.rows\[0\]\.payment_method === "online"\)[\s\S]*buildPaymentUrl/);
+  const onlineBranchIndex = createSource.indexOf(
+    'if (result.rows[0].payment_method === "online")',
+  );
+  const onlineReturnIndex = createSource.indexOf("bookingId: booking.id", onlineBranchIndex);
+  const cashEmailIndex = createSource.indexOf("sendBookingConfirmationEmail", onlineBranchIndex);
+  assert.ok(onlineReturnIndex < cashEmailIndex);
+  assert.match(
+    service,
+    /if \(verification\.isSuccess\) \{[\s\S]*sendBookingConfirmationEmail/,
+  );
 });
 
 test("holding a slot is protected by a transaction lock and timeout deletes only the created hold", () => {
